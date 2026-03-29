@@ -11,8 +11,11 @@ RUN npm ci --omit=dev
 
 COPY src/ src/
 COPY public/ public/
+COPY templates/common/ defaults/common/
+COPY entrypoint.sh entrypoint.sh
 
-RUN mkdir -p /app/data /app/servers /app/templates
+RUN chmod +x entrypoint.sh && \
+    mkdir -p /app/data /app/servers /app/templates
 
 VOLUME ["/app/data", "/app/servers", "/app/templates"]
 
@@ -22,4 +25,4 @@ RUN groupadd -r mcmanager && useradd -r -g mcmanager mcmanager && \
     chown -R mcmanager:mcmanager /app
 USER mcmanager
 
-CMD ["node", "src/index.js"]
+ENTRYPOINT ["./entrypoint.sh"]

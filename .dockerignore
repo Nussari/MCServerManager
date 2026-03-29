@@ -3,4 +3,10 @@ node_modules
 .claude
 servers
 data
+templates/*
+!templates/common/
+*.jar
+*.log
 *.md
+.DS_Store
+Thumbs.db

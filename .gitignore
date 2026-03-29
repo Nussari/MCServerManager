@@ -1,7 +1,10 @@
 node_modules/
-data/servers.json
+data/
 servers/
-templates/*/server.jar
+templates/*
+!templates/common/
 *.log
+*.jar
 .DS_Store
 Thumbs.db
+.claude
