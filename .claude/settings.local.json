@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:minecraft.fandom.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:gist.github.com)",
+      "Bash(npm --version)",
+      "Bash(java -version)",
+      "Bash(npm view:*)",
+      "Bash(node -e \"console.log\\(process.version\\)\")",
+      "Bash(where node:*)",
+      "Bash(where npm:*)"
+    ]
+  }
+}

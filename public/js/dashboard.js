@@ -1,0 +1,264 @@
+const socket = io();
+const serverGrid = document.getElementById('server-grid');
+const emptyState = document.getElementById('empty-state');
+const modalOverlay = document.getElementById('modal-overlay');
+const form = document.getElementById('create-server-form');
+const formError = document.getElementById('form-error');
+const templateSelect = document.getElementById('srv-template');
+
+let servers = [];
+
+socket.emit('join-dashboard');
+
+socket.emit('list-servers', (list) => {
+  servers = list;
+  renderGrid();
+});
+
+// Live updates
+socket.on('server-created', (info) => {
+  servers.push(info);
+  renderGrid();
+});
+
+socket.on('server-deleted', ({ serverId }) => {
+  servers = servers.filter(s => s.id !== serverId);
+  renderGrid();
+});
+
+socket.on('server-updated', (info) => {
+  const idx = servers.findIndex(s => s.id === info.id);
+  if (idx !== -1) servers[idx] = info;
+  renderGrid();
+});
+
+function renderGrid() {
+  if (servers.length === 0) {
+    serverGrid.style.display = 'none';
+    emptyState.style.display = 'block';
+    return;
+  }
+  serverGrid.style.display = 'grid';
+  emptyState.style.display = 'none';
+
+  serverGrid.innerHTML = servers.map(s => `
+    <a href="/server.html?id=${s.id}" class="server-card">
+      <div class="server-card-header">
+        <span class="status-dot ${s.status}"></span>
+        <h3>${esc(s.name)}</h3>
+      </div>
+      <div class="server-card-meta">
+        <span>Port: ${s.port} &middot; ${s.status}</span>
+        ${s.status === 'running' ? `<span>Players: ${s.playerCount}</span>` : ''}
+        <span>Template: ${esc(s.templateName)}</span>
+      </div>
+    </a>
+  `).join('');
+}
+
+function loadTemplates() {
+  socket.emit('list-templates', (templates) => {
+    templateSelect.innerHTML = '';
+    const ready = templates.filter(t => t.hasJar);
+    if (ready.length === 0) {
+      templateSelect.innerHTML = '<option value="" disabled selected>No templates with server jar found</option>';
+    } else {
+      for (const t of ready) {
+        const opt = document.createElement('option');
+        opt.value = t.name;
+        opt.textContent = t.name;
+        templateSelect.appendChild(opt);
+      }
+    }
+  });
+}
+
+// --- Add Server Modal ---
+document.getElementById('add-server-btn').onclick = openModal;
+document.getElementById('add-server-btn-empty').onclick = openModal;
+document.getElementById('cancel-modal').onclick = closeModal;
+modalOverlay.onclick = (e) => { if (e.target === modalOverlay) closeModal(); };
+
+function openModal() {
+  formError.textContent = '';
+  form.reset();
+  modalOverlay.classList.add('active');
+  loadTemplates();
+}
+
+function closeModal() {
+  modalOverlay.classList.remove('active');
+}
+
+form.onsubmit = (e) => {
+  e.preventDefault();
+  formError.textContent = '';
+
+  const ramValue = document.getElementById('srv-maxram').value;
+  const data = {
+    name: document.getElementById('srv-name').value.trim(),
+    templateName: templateSelect.value,
+    port: document.getElementById('srv-port').value || undefined,
+    motd: document.getElementById('srv-motd').value || undefined,
+    difficulty: document.getElementById('srv-difficulty').value,
+    gamemode: document.getElementById('srv-gamemode').value,
+    hardcore: document.getElementById('srv-hardcore').checked,
+    maxRam: `${parseInt(ramValue) * 1024}M`,
+    minRam: '1024M',
+    pvp: document.getElementById('srv-pvp').checked,
+    maxPlayers: document.getElementById('srv-maxplayers').value || undefined,
+    viewDistance: document.getElementById('srv-viewdist').value || undefined,
+    simulationDistance: document.getElementById('srv-simdist').value || undefined,
+    whitelist: document.getElementById('srv-whitelist').checked,
+  };
+
+  if (!data.name) { formError.textContent = 'Name is required'; return; }
+  if (!data.templateName) { formError.textContent = 'Select a template'; return; }
+
+  socket.emit('create-server', data, async (res) => {
+    if (res.ok) {
+      // Upload icon if selected
+      const iconInput = document.getElementById('srv-icon');
+      if (iconInput.files[0]) {
+        const buf = await iconInput.files[0].arrayBuffer();
+        socket.emit('upload-server-icon', { serverId: res.server.id, imageData: buf }, () => {});
+      }
+      closeModal();
+    } else {
+      formError.textContent = res.error;
+    }
+  });
+};
+
+// --- Add Template Modal ---
+const templateModalOverlay = document.getElementById('template-modal-overlay');
+const templateUploadForm = document.getElementById('template-upload-form');
+const templateError = document.getElementById('template-error');
+const templatePickError = document.getElementById('template-pick-error');
+const stepUpload = document.getElementById('template-step-upload');
+const stepPick = document.getElementById('template-step-pick');
+const filePicker = document.getElementById('tpl-file-picker');
+
+let pendingTemplateName = null;
+
+document.getElementById('add-template-btn').onclick = openTemplateModal;
+document.getElementById('cancel-template-modal').onclick = closeTemplateModal;
+document.getElementById('cancel-template-pick').onclick = () => {
+  if (pendingTemplateName) {
+    socket.emit('cancel-template-upload', { name: pendingTemplateName });
+  }
+  closeTemplateModal();
+};
+templateModalOverlay.onclick = (e) => {
+  if (e.target === templateModalOverlay) {
+    if (pendingTemplateName) {
+      socket.emit('cancel-template-upload', { name: pendingTemplateName });
+    }
+    closeTemplateModal();
+  }
+};
+
+function openTemplateModal() {
+  templateError.textContent = '';
+  templatePickError.textContent = '';
+  templateUploadForm.reset();
+  stepUpload.style.display = '';
+  stepPick.style.display = 'none';
+  pendingTemplateName = null;
+  document.getElementById('tpl-upload-btn').disabled = false;
+  document.getElementById('tpl-upload-btn').textContent = 'Upload';
+  templateModalOverlay.classList.add('active');
+}
+
+function closeTemplateModal() {
+  pendingTemplateName = null;
+  templateModalOverlay.classList.remove('active');
+}
+
+templateUploadForm.onsubmit = (e) => {
+  e.preventDefault();
+  templateError.textContent = '';
+
+  const name = document.getElementById('tpl-name').value.trim();
+  const fileInput = document.getElementById('tpl-zip');
+  if (!name) { templateError.textContent = 'Name is required'; return; }
+  if (!fileInput.files[0]) { templateError.textContent = 'Select a ZIP file'; return; }
+
+  const uploadBtn = document.getElementById('tpl-upload-btn');
+  uploadBtn.disabled = true;
+  uploadBtn.textContent = 'Uploading 0%...';
+
+  const xhr = new XMLHttpRequest();
+  xhr.upload.onprogress = (evt) => {
+    if (evt.lengthComputable) {
+      uploadBtn.textContent = `Uploading ${Math.round((evt.loaded / evt.total) * 100)}%...`;
+    }
+  };
+  xhr.onload = () => {
+    let res;
+    try { res = JSON.parse(xhr.responseText); } catch {
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = 'Upload';
+      templateError.textContent = 'Invalid server response';
+      return;
+    }
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = 'Upload';
+    if (!res.ok) {
+      templateError.textContent = res.error;
+      return;
+    }
+    pendingTemplateName = name;
+    showFilePicker(res.files, name);
+  };
+  xhr.onerror = () => {
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = 'Upload';
+    templateError.textContent = 'Upload failed — check your connection';
+  };
+  xhr.open('POST', `/api/upload-template?name=${encodeURIComponent(name)}`);
+  xhr.send(fileInput.files[0]);
+};
+
+function showFilePicker(files, name) {
+  stepUpload.style.display = 'none';
+  stepPick.style.display = '';
+  templatePickError.textContent = '';
+  document.getElementById('tpl-custom-args').value = '';
+
+  const jarFiles = files.filter(f => f.endsWith('.jar'));
+  if (jarFiles.length === 0) {
+    filePicker.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem">No .jar files found in the ZIP</p>';
+  } else {
+    filePicker.innerHTML = jarFiles.map((f, i) => `
+      <label>
+        <input type="radio" name="tpl-jar" value="${esc(f)}" ${i === 0 ? 'checked' : ''}>
+        ${esc(f)}
+      </label>
+    `).join('');
+  }
+
+  document.getElementById('confirm-template').disabled = false;
+}
+
+document.getElementById('confirm-template').onclick = () => {
+  const customArgs = document.getElementById('tpl-custom-args').value.trim();
+  const selected = filePicker.querySelector('input[name="tpl-jar"]:checked');
+  if (!customArgs && !selected) { templatePickError.textContent = 'Select a server file or enter custom arguments'; return; }
+
+  document.getElementById('confirm-template').disabled = true;
+  const payload = { name: pendingTemplateName };
+  if (customArgs) {
+    payload.customArgs = customArgs;
+  } else {
+    payload.serverJar = selected.value;
+  }
+  socket.emit('finalize-template', payload, (res) => {
+    document.getElementById('confirm-template').disabled = false;
+    if (res.ok) {
+      closeTemplateModal();
+    } else {
+      templatePickError.textContent = res.error;
+    }
+  });
+};

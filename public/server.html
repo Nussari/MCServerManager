@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server Console</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/">&larr; Dashboard</a>
+    <h1 id="server-name">Loading...</h1>
+    <span class="spacer"></span>
+    <span class="status-badge" id="status-badge">--</span>
+  </nav>
+
+  <main class="server-detail">
+    <div class="server-info" id="server-info"></div>
+
+    <div class="server-actions" id="server-actions">
+      <button class="btn btn-primary" id="btn-start" style="display:none">Start</button>
+      <button class="btn btn-danger" id="btn-stop" style="display:none">Stop</button>
+      <button class="btn btn-secondary" id="btn-edit">Edit</button>
+      <button class="btn btn-danger" id="btn-delete">Delete</button>
+    </div>
+
+    <div class="console-container" style="margin-top:16px; position:relative">
+      <div class="console-output" id="console-output"></div>
+      <button class="scroll-to-bottom" id="scroll-btn">Scroll to bottom</button>
+      <div class="console-input-row">
+        <input type="text" id="command-input" placeholder="Enter command..." autocomplete="off">
+        <button id="send-btn">Send</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Edit Server Modal -->
+  <div class="modal-overlay" id="edit-modal-overlay">
+    <div class="modal">
+      <h2>Edit Server</h2>
+      <div class="notice">Property changes require a server restart to take effect.</div>
+      <form id="edit-server-form">
+        <div class="form-group">
+          <label for="edit-name">Server Name</label>
+          <input type="text" id="edit-name" required placeholder="My Server">
+        </div>
+        <div class="form-group">
+          <label for="edit-motd">MOTD</label>
+          <input type="text" id="edit-motd" placeholder="A Minecraft Server">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="edit-difficulty">Difficulty</label>
+            <select id="edit-difficulty">
+              <option value="peaceful">Peaceful</option>
+              <option value="easy">Easy</option>
+              <option value="normal">Normal</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="edit-gamemode">Gamemode</label>
+            <select id="edit-gamemode">
+              <option value="survival">Survival</option>
+              <option value="creative">Creative</option>
+              <option value="adventure">Adventure</option>
+              <option value="spectator">Spectator</option>
+            </select>
+          </div>
+        </div>
+        <div class="toggle-group">
+          <label>Hardcore</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="edit-hardcore">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <details class="advanced-section">
+          <summary>Advanced Settings</summary>
+          <div class="form-group">
+            <label for="edit-maxram">Max RAM</label>
+            <select id="edit-maxram">
+              <option value="1">1 GB</option>
+              <option value="2">2 GB</option>
+              <option value="3">3 GB</option>
+              <option value="4">4 GB</option>
+              <option value="5">5 GB</option>
+              <option value="6">6 GB</option>
+              <option value="7">7 GB</option>
+              <option value="8">8 GB</option>
+            </select>
+          </div>
+          <div class="toggle-group">
+            <label>PVP</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="edit-pvp">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label for="edit-port">Port</label>
+            <input type="number" id="edit-port" min="1024" max="65535">
+          </div>
+          <div class="form-group">
+            <label for="edit-maxplayers">Max Players</label>
+            <input type="number" id="edit-maxplayers" min="1">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="edit-viewdist">View Distance</label>
+              <input type="number" id="edit-viewdist" min="2" max="32">
+            </div>
+            <div class="form-group">
+              <label for="edit-simdist">Simulation Distance</label>
+              <input type="number" id="edit-simdist" min="2" max="32">
+            </div>
+          </div>
+          <div class="toggle-group">
+            <label>Whitelist</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="edit-whitelist">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label for="edit-icon">Server Icon (optional)</label>
+            <input type="file" id="edit-icon" accept=".png,.jpg,.jpeg">
+          </div>
+        </details>
+
+        <div class="form-error" id="edit-form-error"></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" id="cancel-edit">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/utils.js"></script>
+  <script src="/js/console.js"></script>
+</body>
+</html>
