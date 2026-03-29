@@ -1,15 +1,18 @@
+FROM eclipse-temurin:21-jre AS jre
+
 FROM node:20-slim
 
+ENV JAVA_HOME=/opt/java/openjdk
+ENV PATH=$JAVA_HOME/bin:$PATH
+COPY --from=jre $JAVA_HOME $JAVA_HOME
+
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends wget apt-transport-https gnupg && \
-    mkdir -p /etc/apt/keyrings && \
-    wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor -o /etc/apt/keyrings/adoptium.gpg && \
-    echo "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb $(. /etc/os-release && echo $VERSION_CODENAME) main" > /etc/apt/sources.list.d/adoptium.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends temurin-21-jre && \
-    apt-get purge -y wget apt-transport-https gnupg && \
-    apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends \
+        fontconfig \
+        ca-certificates \
+        p11-kit \
+        tzdata \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
