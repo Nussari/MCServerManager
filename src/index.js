@@ -41,6 +41,32 @@ app.post('/api/upload-template', async (req, res) => {
   }
 });
 
+// HTTP server import — streams ZIP to disk, same pattern as template upload
+app.post('/api/import-server', async (req, res) => {
+  const name = req.query.name;
+  if (!name) {
+    return res.json({ ok: false, error: 'Missing server name' });
+  }
+
+  const tempZip = path.join(config.DATA_DIR, `_upload_${Date.now()}_import.zip`);
+  try {
+    await new Promise((resolve, reject) => {
+      const ws = fs.createWriteStream(tempZip);
+      req.pipe(ws);
+      ws.on('finish', resolve);
+      ws.on('error', reject);
+      req.on('error', reject);
+    });
+
+    const result = await manager.importServer(name, tempZip);
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  } finally {
+    try { fs.rmSync(tempZip, { force: true }); } catch {}
+  }
+});
+
 // Initialize server manager
 manager.init();
 console.log(`Loaded ${manager.listServers().length} server(s) from registry`);
@@ -166,6 +192,26 @@ io.on('connection', (socket) => {
   socket.on('cancel-template-upload', (data, callback) => {
     try {
       manager.cancelTemplateUpload(data.name);
+      if (callback) callback({ ok: true });
+    } catch (err) {
+      if (callback) callback({ ok: false, error: err.message });
+    }
+  });
+
+  // Import server finalize/cancel (upload is handled via HTTP POST /api/import-server)
+  socket.on('finalize-import', (data, callback) => {
+    try {
+      const info = manager.finalizeImport(data.importId, data);
+      io.to('dashboard').emit('server-created', info);
+      callback({ ok: true, server: info });
+    } catch (err) {
+      callback({ ok: false, error: err.message });
+    }
+  });
+
+  socket.on('cancel-import', (data, callback) => {
+    try {
+      manager.cancelImport(data.importId);
       if (callback) callback({ ok: true });
     } catch (err) {
       if (callback) callback({ ok: false, error: err.message });

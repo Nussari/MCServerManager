@@ -1,6 +1,6 @@
 # Minecraft Server Manager
 
-A web dashboard for managing multiple Minecraft servers. Create servers from templates, start/stop them, and interact with the console in real-time — all from your browser.
+A web dashboard for managing multiple Minecraft servers. Create servers from templates, import existing servers, start/stop them, and interact with the console in real-time — all from your browser.
 
 ## Project Structure
 
@@ -92,6 +92,23 @@ If no `template.json` exists, defaults to standard mode with `server.jar`.
 
 Click "Add Template" on the dashboard to upload a ZIP file. After upload, either select a `.jar` file for standard mode, or enter custom Java arguments for modded servers (e.g. NeoForge). The `template.json` is created automatically.
 
+## Importing Existing Servers
+
+Click "Import Server" on the dashboard to import an existing Minecraft server from a ZIP file. This creates a server instance directly from your existing server files — preserving world data, mods, plugins, and configuration.
+
+**How it works:**
+1. Enter a server name and upload a ZIP of your server directory
+2. The service scans the ZIP for `.jar` files, reads `server.properties` for settings, and detects modded server indicators (NeoForge/Fabric args files)
+3. Select the server JAR or enter custom Java arguments for modded servers
+4. Optionally adjust the detected port, RAM, and server name in the advanced settings
+5. Click "Import Server" to finalize — the server appears on your dashboard ready to start
+
+**Notes:**
+- If your ZIP has a single nested root folder, it is automatically unwrapped
+- If `eula.txt` is missing or not accepted, it is automatically created
+- Imported servers show `(imported)` as their template name
+- The detected `server-port` from `server.properties` is pre-filled but can be overridden
+
 ### Example templates
 
 - **vanilla/** — Official Minecraft server
@@ -159,7 +176,7 @@ All settings are configurable via environment variables:
 ## How It Works
 
 - **Process management**: Each Minecraft server runs as a child process of the Node.js service. Stdin is piped for commands, stdout/stderr are captured for the console.
-- **Communication**: Real-time events use Socket.IO (WebSocket). Template ZIP uploads use an HTTP POST endpoint (`/api/upload-template`) to support large files with streaming and progress tracking.
+- **Communication**: Real-time events use Socket.IO (WebSocket). Template and server import ZIP uploads use HTTP POST endpoints (`/api/upload-template`, `/api/import-server`) to support large files with streaming and progress tracking.
 - **Persistence**: Server registry is stored in `data/servers.json`. On service restart, all servers start in "stopped" state — you decide what to start.
 - **Graceful shutdown**: On SIGTERM/SIGINT, the service sends `stop` to all running Minecraft servers and waits for them to save before exiting.
 
@@ -184,12 +201,15 @@ All settings are configurable via environment variables:
 | `upload-server-icon` | `{ serverId, imageData: ArrayBuffer }` | Upload custom 64x64 server icon |
 | `finalize-template` | `{ name, serverJar }` | Confirm template with chosen server jar |
 | `cancel-template-upload` | `{ name }` | Cancel pending template upload |
+| `finalize-import` | `{ importId, name, serverJar?, customArgs?, port?, minRam?, maxRam? }` | Confirm server import with chosen jar/args |
+| `cancel-import` | `{ importId }` | Cancel pending server import |
 
 ### HTTP Endpoints
 
 | Method | Path | Body | Description |
 |--------|------|------|-------------|
 | `POST` | `/api/upload-template?name=<name>` | Raw ZIP binary | Upload template ZIP (streams to disk). Returns `{ ok, files }`. |
+| `POST` | `/api/import-server?name=<name>` | Raw ZIP binary | Upload server ZIP for import (streams to disk). Returns `{ ok, importId, jarFiles, detectedSettings, hasEula, moddedHint }`. |
 
 ### Server → Client
 

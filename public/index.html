@@ -11,6 +11,7 @@
     <h1>MC Server Manager</h1>
     <span class="spacer"></span>
     <button class="btn btn-secondary" id="add-template-btn">Add Template</button>
+    <button class="btn btn-secondary" id="import-server-btn">Import Server</button>
     <button class="btn btn-primary" id="add-server-btn">Add Server</button>
   </nav>
 
@@ -167,6 +168,75 @@
         <div class="form-actions">
           <button type="button" class="btn btn-secondary" id="cancel-template-pick">Cancel</button>
           <button type="button" class="btn btn-primary" id="confirm-template">Create Template</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Server Modal -->
+  <div class="modal-overlay" id="import-modal-overlay">
+    <div class="modal">
+      <h2>Import Server</h2>
+
+      <!-- Step 1: Upload -->
+      <div id="import-step-upload">
+        <form id="import-upload-form">
+          <div class="form-group">
+            <label for="imp-name">Server Name</label>
+            <input type="text" id="imp-name" required placeholder="My Server">
+          </div>
+          <div class="form-group">
+            <label for="imp-zip">Server ZIP</label>
+            <input type="file" id="imp-zip" required accept=".zip">
+          </div>
+          <div class="form-error" id="import-error"></div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" id="cancel-import-modal">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="imp-upload-btn">Upload</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Step 2: Configure -->
+      <div id="import-step-configure" style="display:none">
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px">Select the server JAR file:</p>
+        <div class="file-picker" id="imp-file-picker"></div>
+        <div style="margin:14px 0; text-align:center; color:var(--text-muted); font-size:0.8rem">— or for modded servers —</div>
+        <div class="form-group">
+          <label for="imp-custom-args">Custom Java Arguments</label>
+          <input type="text" id="imp-custom-args" placeholder="@user_jvm_args.txt @libraries/.../unix_args.txt">
+        </div>
+        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:12px">If set, RAM settings are managed by the args files, not by the GUI.</p>
+
+        <details class="advanced-section">
+          <summary>Server Settings</summary>
+          <div class="form-group">
+            <label for="imp-name2">Server Name</label>
+            <input type="text" id="imp-name2" required placeholder="My Server">
+          </div>
+          <div class="form-group">
+            <label for="imp-port">Port</label>
+            <input type="number" id="imp-port" placeholder="25565" min="1024" max="65535">
+          </div>
+          <div class="form-group">
+            <label for="imp-maxram">Max RAM</label>
+            <select id="imp-maxram">
+              <option value="1">1 GB</option>
+              <option value="2">2 GB</option>
+              <option value="3">3 GB</option>
+              <option value="4" selected>4 GB</option>
+              <option value="5">5 GB</option>
+              <option value="6">6 GB</option>
+              <option value="7">7 GB</option>
+              <option value="8">8 GB</option>
+            </select>
+          </div>
+        </details>
+
+        <div class="form-error" id="import-configure-error"></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" id="cancel-import-configure">Cancel</button>
+          <button type="button" class="btn btn-primary" id="confirm-import">Import Server</button>
         </div>
       </div>
     </div>

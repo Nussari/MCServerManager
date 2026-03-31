@@ -262,3 +262,166 @@ document.getElementById('confirm-template').onclick = () => {
     }
   });
 };
+
+// --- Import Server Modal ---
+const importModalOverlay = document.getElementById('import-modal-overlay');
+const importUploadForm = document.getElementById('import-upload-form');
+const importError = document.getElementById('import-error');
+const importConfigureError = document.getElementById('import-configure-error');
+const importStepUpload = document.getElementById('import-step-upload');
+const importStepConfigure = document.getElementById('import-step-configure');
+const impFilePicker = document.getElementById('imp-file-picker');
+
+let pendingImportId = null;
+
+document.getElementById('import-server-btn').onclick = openImportModal;
+document.getElementById('cancel-import-modal').onclick = closeImportModal;
+document.getElementById('cancel-import-configure').onclick = () => {
+  if (pendingImportId) {
+    socket.emit('cancel-import', { importId: pendingImportId });
+  }
+  closeImportModal();
+};
+importModalOverlay.onclick = (e) => {
+  if (e.target === importModalOverlay) {
+    if (pendingImportId) {
+      socket.emit('cancel-import', { importId: pendingImportId });
+    }
+    closeImportModal();
+  }
+};
+
+function openImportModal() {
+  importError.textContent = '';
+  importConfigureError.textContent = '';
+  importUploadForm.reset();
+  importStepUpload.style.display = '';
+  importStepConfigure.style.display = 'none';
+  pendingImportId = null;
+  document.getElementById('imp-upload-btn').disabled = false;
+  document.getElementById('imp-upload-btn').textContent = 'Upload';
+  importModalOverlay.classList.add('active');
+}
+
+function closeImportModal() {
+  pendingImportId = null;
+  importModalOverlay.classList.remove('active');
+}
+
+importUploadForm.onsubmit = (e) => {
+  e.preventDefault();
+  importError.textContent = '';
+
+  const name = document.getElementById('imp-name').value.trim();
+  const fileInput = document.getElementById('imp-zip');
+  if (!name) { importError.textContent = 'Name is required'; return; }
+  if (!fileInput.files[0]) { importError.textContent = 'Select a ZIP file'; return; }
+
+  const uploadBtn = document.getElementById('imp-upload-btn');
+  uploadBtn.disabled = true;
+  uploadBtn.textContent = 'Uploading 0%...';
+
+  const xhr = new XMLHttpRequest();
+  xhr.upload.onprogress = (evt) => {
+    if (evt.lengthComputable) {
+      uploadBtn.textContent = `Uploading ${Math.round((evt.loaded / evt.total) * 100)}%...`;
+    }
+  };
+  xhr.onload = () => {
+    let res;
+    try { res = JSON.parse(xhr.responseText); } catch {
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = 'Upload';
+      importError.textContent = 'Invalid server response';
+      return;
+    }
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = 'Upload';
+    if (!res.ok) {
+      importError.textContent = res.error;
+      return;
+    }
+    pendingImportId = res.importId;
+    showImportConfigure(res);
+  };
+  xhr.onerror = () => {
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = 'Upload';
+    importError.textContent = 'Upload failed — check your connection';
+  };
+  xhr.open('POST', `/api/import-server?name=${encodeURIComponent(name)}`);
+  xhr.send(fileInput.files[0]);
+};
+
+function showImportConfigure(data) {
+  importStepUpload.style.display = 'none';
+  importStepConfigure.style.display = '';
+  importConfigureError.textContent = '';
+  document.getElementById('imp-custom-args').value = '';
+
+  // Populate jar file picker
+  const jarFiles = data.jarFiles || [];
+  if (jarFiles.length === 0) {
+    impFilePicker.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem">No .jar files found in the ZIP</p>';
+  } else {
+    impFilePicker.innerHTML = jarFiles.map((f, i) => `
+      <label>
+        <input type="radio" name="imp-jar" value="${esc(f)}" ${i === 0 ? 'checked' : ''}>
+        ${esc(f)}
+      </label>
+    `).join('');
+  }
+
+  // Pre-fill modded hint
+  if (data.moddedHint) {
+    document.getElementById('imp-custom-args').value = data.moddedHint;
+  }
+
+  // Pre-fill settings from detected server.properties
+  document.getElementById('imp-name2').value = data.name || '';
+  const detected = data.detectedSettings || {};
+  if (detected['server-port']) {
+    document.getElementById('imp-port').value = detected['server-port'];
+  }
+
+  document.getElementById('confirm-import').disabled = false;
+}
+
+document.getElementById('confirm-import').onclick = () => {
+  const customArgs = document.getElementById('imp-custom-args').value.trim();
+  const selected = impFilePicker.querySelector('input[name="imp-jar"]:checked');
+  if (!customArgs && !selected) {
+    importConfigureError.textContent = 'Select a server file or enter custom arguments';
+    return;
+  }
+
+  const name = document.getElementById('imp-name2').value.trim();
+  if (!name) {
+    importConfigureError.textContent = 'Server name is required';
+    return;
+  }
+
+  document.getElementById('confirm-import').disabled = true;
+  const ramValue = document.getElementById('imp-maxram').value;
+  const payload = {
+    importId: pendingImportId,
+    name,
+    port: document.getElementById('imp-port').value || undefined,
+    minRam: '1024M',
+    maxRam: `${parseInt(ramValue) * 1024}M`,
+  };
+  if (customArgs) {
+    payload.customArgs = customArgs;
+  } else {
+    payload.serverJar = selected.value;
+  }
+
+  socket.emit('finalize-import', payload, (res) => {
+    document.getElementById('confirm-import').disabled = false;
+    if (res.ok) {
+      closeImportModal();
+    } else {
+      importConfigureError.textContent = res.error;
+    }
+  });
+};

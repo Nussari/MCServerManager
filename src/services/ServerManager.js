@@ -32,6 +32,13 @@ class ServerManager extends EventEmitter {
       }
     }
 
+    // Clean up any leftover temp import directories
+    for (const d of fs.readdirSync(config.SERVERS_DIR, { withFileTypes: true })) {
+      if (d.isDirectory() && d.name.startsWith('_importing_')) {
+        fs.rmSync(path.join(config.SERVERS_DIR, d.name), { recursive: true, force: true });
+      }
+    }
+
     for (const entry of entries) {
       if (!fs.existsSync(entry.directory)) continue;
       const server = new MinecraftServer(entry);
@@ -324,6 +331,195 @@ class ServerManager extends EventEmitter {
 
   cancelTemplateUpload(name) {
     const tempDir = path.join(config.TEMPLATES_DIR, `_uploading_${name}`);
+    if (fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  // --- Import existing server ---
+
+  async importServer(name, zipFilePath) {
+    if (!name || !/^[a-zA-Z0-9 _.-]+$/.test(name)) {
+      throw new Error('Invalid server name');
+    }
+
+    const importId = uuidv4();
+    const tempDir = path.join(config.SERVERS_DIR, `_importing_${importId}`);
+
+    const zip = new AdmZip(zipFilePath);
+    await zip.extractAllToAsync(tempDir, true);
+
+    // Unwrap nested root folder: if the extracted dir contains exactly 1 subdir and 0 files, move contents up
+    const topEntries = fs.readdirSync(tempDir, { withFileTypes: true });
+    const topDirs = topEntries.filter(e => e.isDirectory());
+    const topFiles = topEntries.filter(e => e.isFile());
+    if (topDirs.length === 1 && topFiles.length === 0) {
+      const nestedDir = path.join(tempDir, topDirs[0].name);
+      const nestedEntries = fs.readdirSync(nestedDir);
+      for (const entry of nestedEntries) {
+        const src = path.join(nestedDir, entry);
+        const dest = path.join(tempDir, entry);
+        fs.renameSync(src, dest);
+      }
+      fs.rmdirSync(nestedDir);
+    }
+
+    // Scan for .jar files (top level + 1 level deep)
+    const jarFiles = [];
+    for (const entry of fs.readdirSync(tempDir, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith('.jar')) {
+        jarFiles.push(entry.name);
+      } else if (entry.isDirectory()) {
+        for (const sub of fs.readdirSync(path.join(tempDir, entry.name), { withFileTypes: true })) {
+          if (sub.isFile() && sub.name.endsWith('.jar')) {
+            jarFiles.push(`${entry.name}/${sub.name}`);
+          }
+        }
+      }
+    }
+
+    // Read server.properties if present
+    let detectedSettings = {};
+    const propsPath = path.join(tempDir, 'server.properties');
+    if (fs.existsSync(propsPath)) {
+      const { entries } = properties.parse(propsPath);
+      detectedSettings = {
+        'server-port': entries['server-port'],
+        motd: entries.motd,
+        difficulty: entries.difficulty,
+        gamemode: entries.gamemode,
+        'max-players': entries['max-players'],
+        hardcore: entries.hardcore,
+        pvp: entries.pvp,
+        'view-distance': entries['view-distance'],
+        'simulation-distance': entries['simulation-distance'],
+        'white-list': entries['white-list'],
+      };
+    }
+
+    // Check eula.txt
+    const eulaPath = path.join(tempDir, 'eula.txt');
+    const hasEula = fs.existsSync(eulaPath) && fs.readFileSync(eulaPath, 'utf-8').includes('eula=true');
+
+    // Detect modded server hints
+    let moddedHint = null;
+    const hasUserJvmArgs = fs.existsSync(path.join(tempDir, 'user_jvm_args.txt'));
+    if (hasUserJvmArgs) {
+      // Look for NeoForge/Forge args files
+      const libDir = path.join(tempDir, 'libraries');
+      if (fs.existsSync(libDir)) {
+        const argsFile = this._findArgsFile(libDir, 'libraries');
+        if (argsFile) {
+          moddedHint = `@user_jvm_args.txt @${argsFile}`;
+        }
+      }
+    }
+
+    return { importId, name, jarFiles, detectedSettings, hasEula, moddedHint };
+  }
+
+  _findArgsFile(dir, prefix) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const rel = `${prefix}/${entry.name}`;
+      if (entry.isDirectory()) {
+        const found = this._findArgsFile(path.join(dir, entry.name), rel);
+        if (found) return found;
+      } else if (entry.name === 'unix_args.txt' || entry.name === 'win_args.txt') {
+        return rel;
+      }
+    }
+    return null;
+  }
+
+  finalizeImport(importId, { name, serverJar, customArgs, port, minRam, maxRam }) {
+    const tempDir = path.join(config.SERVERS_DIR, `_importing_${importId}`);
+    if (!fs.existsSync(tempDir)) {
+      throw new Error('No pending import found');
+    }
+
+    if (!name || !/^[a-zA-Z0-9 _.-]+$/.test(name)) {
+      throw new Error('Invalid server name');
+    }
+
+    // Determine startArgs
+    let startArgs;
+    if (customArgs) {
+      const args = customArgs.trim().split(/\s+/);
+      if (args.length === 0) throw new Error('Custom arguments cannot be empty');
+      startArgs = args;
+    } else if (serverJar) {
+      if (serverJar.includes('..') || path.isAbsolute(serverJar)) {
+        throw new Error('Invalid server jar path');
+      }
+      if (!fs.existsSync(path.join(tempDir, serverJar))) {
+        throw new Error(`Selected file not found: ${serverJar}`);
+      }
+      startArgs = ['-jar', serverJar, 'nogui'];
+    } else {
+      throw new Error('Must provide either a server jar or custom arguments');
+    }
+
+    // Ensure eula.txt
+    const eulaPath = path.join(tempDir, 'eula.txt');
+    if (!fs.existsSync(eulaPath) || !fs.readFileSync(eulaPath, 'utf-8').includes('eula=true')) {
+      fs.writeFileSync(eulaPath, 'eula=true\n', 'utf-8');
+    }
+
+    // Resolve port
+    if (!port) {
+      port = config.BASE_MC_PORT;
+    } else {
+      port = parseInt(port, 10);
+      if (isNaN(port) || port < 1024 || port > 65535) {
+        throw new Error('Port must be between 1024 and 65535');
+      }
+    }
+
+    // Update server.properties with the port
+    const propsPath = path.join(tempDir, 'server.properties');
+    let lines = [];
+    if (fs.existsSync(propsPath)) {
+      lines = properties.parse(propsPath).lines;
+    }
+    properties.write(propsPath, { 'server-port': String(port) }, lines);
+
+    // Resolve RAM
+    const resolvedMinRam = minRam || config.DEFAULT_MIN_RAM;
+    const resolvedMaxRam = maxRam || config.DEFAULT_MAX_RAM;
+    if (!/^\d+[MG]$/.test(resolvedMinRam) || !/^\d+[MG]$/.test(resolvedMaxRam)) {
+      throw new Error('Invalid RAM format');
+    }
+
+    // Rename temp dir to final location
+    const serverDir = path.join(config.SERVERS_DIR, importId);
+    try {
+      fs.renameSync(tempDir, serverDir);
+    } catch {
+      fs.cpSync(tempDir, serverDir, { recursive: true });
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+
+    const server = new MinecraftServer({
+      id: importId,
+      name,
+      templateName: '(imported)',
+      directory: serverDir,
+      port,
+      startArgs,
+      minRam: resolvedMinRam,
+      maxRam: resolvedMaxRam,
+      createdAt: new Date().toISOString(),
+    });
+
+    this._wireEvents(server);
+    this.servers.set(importId, server);
+    this._persist();
+
+    return server.getInfo();
+  }
+
+  cancelImport(importId) {
+    const tempDir = path.join(config.SERVERS_DIR, `_importing_${importId}`);
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
