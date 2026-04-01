@@ -12,7 +12,6 @@ const infoEl = document.getElementById('server-info');
 const btnStart = document.getElementById('btn-start');
 const btnStop = document.getElementById('btn-stop');
 const btnEdit = document.getElementById('btn-edit');
-const btnDelete = document.getElementById('btn-delete');
 const consoleOutput = document.getElementById('console-output');
 const commandInput = document.getElementById('command-input');
 const sendBtn = document.getElementById('send-btn');
@@ -117,18 +116,6 @@ btnStop.onclick = () => {
   });
 };
 
-btnDelete.onclick = () => {
-  if (!confirm('Delete this server? This will remove all server files.')) return;
-  btnDelete.disabled = true;
-  socket.emit('delete-server', { serverId }, (res) => {
-    if (res.ok) {
-      window.location.href = '/';
-    } else {
-      btnDelete.disabled = false;
-      alert('Failed to delete: ' + res.error);
-    }
-  });
-};
 
 function updateButtons() {
   const isRunning = currentStatus === 'running';
@@ -155,6 +142,17 @@ btnEdit.onclick = () => {
 };
 
 document.getElementById('cancel-edit').onclick = closeEditModal;
+
+document.getElementById('btn-delete').onclick = () => {
+  if (!confirm('Delete this server? This will remove all server files.')) return;
+  socket.emit('delete-server', { serverId }, (res) => {
+    if (res.ok) {
+      window.location.href = '/';
+    } else {
+      alert('Failed to delete: ' + res.error);
+    }
+  });
+};
 editModalOverlay.onclick = (e) => { if (e.target === editModalOverlay) closeEditModal(); };
 
 function closeEditModal() {
