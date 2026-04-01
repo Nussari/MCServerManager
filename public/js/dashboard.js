@@ -387,6 +387,21 @@ function showImportConfigure(data) {
   document.getElementById('confirm-import').disabled = false;
 }
 
+// --- Hamburger menu (mobile) ---
+const hamburgerBtn = document.getElementById('hamburger-btn');
+const navSecondaryActions = document.getElementById('nav-secondary-actions');
+
+hamburgerBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const isOpen = navSecondaryActions.classList.toggle('open');
+  hamburgerBtn.setAttribute('aria-expanded', String(isOpen));
+});
+
+document.addEventListener('click', () => {
+  navSecondaryActions.classList.remove('open');
+  hamburgerBtn.setAttribute('aria-expanded', 'false');
+});
+
 document.getElementById('confirm-import').onclick = () => {
   const customArgs = document.getElementById('imp-custom-args').value.trim();
   const selected = impFilePicker.querySelector('input[name="imp-jar"]:checked');
