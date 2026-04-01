@@ -10,9 +10,14 @@
   <nav class="navbar">
     <h1>MC Server Manager</h1>
     <span class="spacer"></span>
-    <button class="btn btn-secondary" id="add-template-btn">Add Template</button>
-    <button class="btn btn-secondary" id="import-server-btn">Import Server</button>
+    <div class="nav-secondary-actions" id="nav-secondary-actions">
+      <button class="btn btn-secondary" id="add-template-btn">Add Template</button>
+      <button class="btn btn-secondary" id="import-server-btn">Import Server</button>
+    </div>
     <button class="btn btn-primary" id="add-server-btn">Add Server</button>
+    <button class="hamburger-btn" id="hamburger-btn" aria-label="More options" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
   </nav>
 
   <main class="dashboard-content">
