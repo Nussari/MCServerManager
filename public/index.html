@@ -12,6 +12,7 @@
     <span class="spacer"></span>
     <div class="nav-secondary-actions" id="nav-secondary-actions">
       <button class="btn btn-secondary" id="add-template-btn">Add Template</button>
+      <button class="btn btn-secondary" id="view-templates-btn">View Templates</button>
       <button class="btn btn-secondary" id="import-server-btn">Import Server</button>
     </div>
     <button class="btn btn-primary" id="add-server-btn">Add Server</button>
@@ -243,6 +244,18 @@
           <button type="button" class="btn btn-secondary" id="cancel-import-configure">Cancel</button>
           <button type="button" class="btn btn-primary" id="confirm-import">Import Server</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Templates Modal -->
+  <div class="modal-overlay" id="view-templates-modal-overlay">
+    <div class="modal">
+      <h2>Templates</h2>
+      <div id="view-templates-list" style="min-height:60px"></div>
+      <div class="form-error" id="view-templates-error"></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="close-view-templates-modal">Close</button>
       </div>
     </div>
   </div>

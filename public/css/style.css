@@ -98,6 +98,21 @@ body {
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-secondary { background: var(--border); color: var(--text); }
+.btn-sm { padding: 4px 10px; font-size: 0.8rem; }
+
+/* Template list rows */
+.template-list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.template-list-row:last-child { border-bottom: none; }
+.template-list-name { flex: 1; font-size: 0.9rem; }
+.template-list-status { font-size: 0.78rem; padding: 2px 7px; border-radius: 4px; }
+.template-list-status.ready { background: rgba(74,222,128,0.15); color: #4ade80; }
+.template-list-status.not-ready { background: rgba(255,165,0,0.15); color: orange; }
 
 /* Server card grid */
 .dashboard-content { padding: 24px; }

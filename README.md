@@ -92,6 +92,10 @@ If no `template.json` exists, defaults to standard mode with `server.jar`.
 
 Click "Add Template" on the dashboard to upload a ZIP file. After upload, either select a `.jar` file for standard mode, or enter custom Java arguments for modded servers (e.g. NeoForge). The `template.json` is created automatically.
 
+### Managing Templates via GUI
+
+Click "View Templates" on the dashboard to see all available templates with their readiness status. From this view you can delete any template. Deleting a template does not affect servers already created from it.
+
 ## Importing Existing Servers
 
 Click "Import Server" on the dashboard to import an existing Minecraft server from a ZIP file. This creates a server instance directly from your existing server files — preserving world data, mods, plugins, and configuration.
@@ -201,6 +205,7 @@ All settings are configurable via environment variables:
 | `upload-server-icon` | `{ serverId, imageData: ArrayBuffer }` | Upload custom 64x64 server icon |
 | `finalize-template` | `{ name, serverJar }` | Confirm template with chosen server jar |
 | `cancel-template-upload` | `{ name }` | Cancel pending template upload |
+| `delete-template` | `{ name }` | Delete a template directory (callback) |
 | `finalize-import` | `{ importId, name, serverJar?, customArgs?, port?, minRam?, maxRam? }` | Confirm server import with chosen jar/args |
 | `cancel-import` | `{ importId }` | Cancel pending server import |
 

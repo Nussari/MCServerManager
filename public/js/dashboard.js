@@ -387,6 +387,60 @@ function showImportConfigure(data) {
   document.getElementById('confirm-import').disabled = false;
 }
 
+// --- View Templates Modal ---
+const viewTemplatesModalOverlay = document.getElementById('view-templates-modal-overlay');
+const viewTemplatesList = document.getElementById('view-templates-list');
+const viewTemplatesError = document.getElementById('view-templates-error');
+
+document.getElementById('view-templates-btn').onclick = openViewTemplatesModal;
+document.getElementById('close-view-templates-modal').onclick = closeViewTemplatesModal;
+viewTemplatesModalOverlay.onclick = (e) => { if (e.target === viewTemplatesModalOverlay) closeViewTemplatesModal(); };
+
+function openViewTemplatesModal() {
+  viewTemplatesError.textContent = '';
+  viewTemplatesList.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem">Loading...</p>';
+  viewTemplatesModalOverlay.classList.add('active');
+  refreshViewTemplatesList();
+}
+
+function closeViewTemplatesModal() {
+  viewTemplatesModalOverlay.classList.remove('active');
+}
+
+function refreshViewTemplatesList() {
+  socket.emit('list-templates', (templates) => {
+    viewTemplatesError.textContent = '';
+    if (templates.length === 0) {
+      viewTemplatesList.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem">No templates found.</p>';
+      return;
+    }
+    viewTemplatesList.innerHTML = templates.map(t => `
+      <div class="template-list-row" data-name="${esc(t.name)}">
+        <span class="template-list-name">${esc(t.name)}</span>
+        <span class="template-list-status ${t.hasJar ? 'ready' : 'not-ready'}">${t.hasJar ? 'Ready' : 'Not ready'}</span>
+        <button class="btn btn-danger btn-sm delete-template-btn" data-name="${esc(t.name)}">Delete</button>
+      </div>
+    `).join('');
+
+    viewTemplatesList.querySelectorAll('.delete-template-btn').forEach(btn => {
+      btn.onclick = () => deleteTemplate(btn.dataset.name, btn);
+    });
+  });
+}
+
+function deleteTemplate(name, btn) {
+  if (!confirm(`Delete template "${name}"? This cannot be undone.`)) return;
+  btn.disabled = true;
+  socket.emit('delete-template', { name }, (res) => {
+    if (res.ok) {
+      refreshViewTemplatesList();
+    } else {
+      viewTemplatesError.textContent = res.error;
+      btn.disabled = false;
+    }
+  });
+}
+
 // --- Hamburger menu (mobile) ---
 const hamburgerBtn = document.getElementById('hamburger-btn');
 const navSecondaryActions = document.getElementById('nav-secondary-actions');

@@ -336,6 +336,20 @@ class ServerManager extends EventEmitter {
     }
   }
 
+  deleteTemplate(name) {
+    if (!name || !/^[a-zA-Z0-9._-]+$/.test(name)) {
+      throw new Error('Invalid template name');
+    }
+    if (name === 'common') {
+      throw new Error('Cannot delete the reserved "common" template');
+    }
+    const templateDir = path.join(config.TEMPLATES_DIR, name);
+    if (!fs.existsSync(templateDir)) {
+      throw new Error(`Template not found: ${name}`);
+    }
+    fs.rmSync(templateDir, { recursive: true, force: true });
+  }
+
   // --- Import existing server ---
 
   async importServer(name, zipFilePath) {
