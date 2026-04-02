@@ -13,6 +13,7 @@ serverService/
 │   │   └── ServerManager.js      # Orchestrates all servers (CRUD, persistence)
 │   └── utils/
 │       ├── config.js             # Environment-based configuration
+│       ├── mojang.js             # Mojang API client (version manifest + JAR download)
 │       └── properties.js         # server.properties file parser/writer
 ├── public/                       # Frontend (vanilla HTML/CSS/JS)
 │   ├── index.html                # Dashboard
@@ -34,7 +35,7 @@ serverService/
 
 - **Node.js 20+**
 - **Java 21+** (for running Minecraft servers)
-- At least one template with a server jar
+- At least one template with a server jar, or use the built-in "Latest Release" option to auto-download
 
 ## Quick Start
 
@@ -52,6 +53,14 @@ npm start
 ```
 
 Open http://localhost:3000 in your browser.
+
+## Latest Release (Auto-Download)
+
+When creating a server, select **"Latest Release (Vanilla)"** from the template dropdown. The service fetches the current release version from Mojang's API, downloads the server JAR (~60MB) with SHA1 verification, and creates the server automatically. A progress bar shows download status.
+
+Downloaded versions are cached as `Vanilla-{version}` template directories (e.g., `templates/Vanilla-26.1.1/`). Subsequent servers using the same version skip the download. These cached templates are hidden from the regular template dropdown — they are only accessible through the "Latest Release" option.
+
+The server's template name is displayed as `Vanilla-{version}` (e.g., `Vanilla-26.1.1`).
 
 ## Templates
 
@@ -192,7 +201,8 @@ All settings are configurable via environment variables:
 |-------|---------|-------------|
 | `list-servers` | — | Get all servers (callback) |
 | `list-templates` | — | Get available templates (callback) |
-| `create-server` | `{ name, templateName, port?, motd?, maxPlayers?, gamemode?, difficulty?, hardcore?, minRam?, maxRam?, pvp?, viewDistance?, simulationDistance?, whitelist? }` | Create server (callback) |
+| `fetch-latest-release` | — | Get latest Minecraft version info from Mojang API (callback: `{ version, jarUrl, sha1, templateName, cached }`) |
+| `create-server` | `{ name, templateName, port?, motd?, maxPlayers?, gamemode?, difficulty?, hardcore?, minRam?, maxRam?, pvp?, viewDistance?, simulationDistance?, whitelist?, _latestRelease? }` | Create server (callback). If `_latestRelease` is present, downloads JAR first |
 | `delete-server` | `{ serverId }` | Delete server (callback) |
 | `start-server` | `{ serverId }` | Start server (callback) |
 | `stop-server` | `{ serverId }` | Stop server (callback) |
@@ -226,3 +236,4 @@ All settings are configurable via environment variables:
 | `output` | `{ line, stream, timestamp }` | Console output line |
 | `output-history` | `[{ line, stream, timestamp }, ...]` | Buffered output on join |
 | `status-change` | `serverInfo` | Server info updated |
+| `download-progress` | `{ downloaded, total }` | JAR download progress (sent to requesting socket only) |

@@ -288,6 +288,11 @@ body {
   margin-top: 8px;
 }
 
+.download-progress { margin-top: 12px; }
+.download-progress-text { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
+.download-progress-bar-bg { height: 6px; background: var(--bg-input); border-radius: 3px; overflow: hidden; }
+.download-progress-bar { height: 100%; background: var(--accent); border-radius: 3px; width: 0%; transition: width 0.3s; }
+
 /* Server detail page */
 .server-detail { padding: 24px; }
 
