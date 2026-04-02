@@ -198,6 +198,15 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('delete-template', (data, callback) => {
+    try {
+      manager.deleteTemplate(data.name);
+      callback({ ok: true });
+    } catch (err) {
+      callback({ ok: false, error: err.message });
+    }
+  });
+
   // Import server finalize/cancel (upload is handled via HTTP POST /api/import-server)
   socket.on('finalize-import', (data, callback) => {
     try {
