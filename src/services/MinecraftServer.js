@@ -78,6 +78,7 @@ class MinecraftServer extends EventEmitter {
 
     // Auto-detect Java version from server JAR
     let javaCmd = this.javaPath;
+    let resolvedVersion = null;
     const installed = Object.keys(config.JAVA_VERSIONS).map(Number).sort((a, b) => a - b);
     if (installed.length > 0) {
       let detectJar = null;
@@ -100,21 +101,25 @@ class MinecraftServer extends EventEmitter {
           const match = installed.find(v => v >= required);
           if (match) {
             javaCmd = config.JAVA_VERSIONS[match];
+            resolvedVersion = match;
             this._pushOutput(`[SYSTEM] Detected Java ${required} required, using Java ${match}`, 'stderr');
           }
         }
       }
     }
 
-    // Use ZGC universally: avoids G1 GC crash on JDK 21 (JDK-8320253) and
-    // changes C2 IR graph shapes on JDK 25 to avoid register allocator crash (JDK-8146466)
-    const gcFlags = ['-XX:+UseZGC'];
+    // GC selection depends on Java version:
+    // - JDK 21: Use ZGC to avoid G1 GC crash (JDK-8320253, not backported to 21)
+    // - JDK 25+: Use default GC (G1 bug fixed since 22; ZGC crashes in ZMark::mark_and_follow)
+    const needsZGC = !resolvedVersion || resolvedVersion < 25;
+    const gcFlags = needsZGC ? ['-XX:+UseZGC'] : [];
     const extraFlags = config.DEFAULT_JVM_FLAGS ? config.DEFAULT_JVM_FLAGS.split(/\s+/).filter(Boolean) : [];
 
-    // In jar mode, prepend RAM, GC, and extra flags. In custom args mode, the args files manage JVM settings.
+    // In jar mode, prepend RAM, GC, and extra flags.
+    // In custom args mode, RAM is managed by the args files but GC flags still need injection.
     const args = isJarMode
       ? [`-Xms${this.minRam}`, `-Xmx${this.maxRam}`, ...gcFlags, ...extraFlags, ...this.startArgs]
-      : [...this.startArgs];
+      : [...gcFlags, ...extraFlags, ...this.startArgs];
 
     this.process = spawn(javaCmd, args, {
       cwd: this.directory,
