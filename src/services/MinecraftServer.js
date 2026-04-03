@@ -110,16 +110,24 @@ class MinecraftServer extends EventEmitter {
 
     // GC selection depends on Java version:
     // - JDK 21: Use ZGC to avoid G1 GC crash (JDK-8320253, not backported to 21)
-    // - JDK 25+: Use default GC (G1 bug fixed since 22; ZGC crashes in ZMark::mark_and_follow)
-    const needsZGC = !resolvedVersion || resolvedVersion < 25;
-    const gcFlags = needsZGC ? ['-XX:+UseZGC'] : [];
+    // - JDK 25+: Use Parallel GC — both G1 (JDK-8366580) and ZGC (ZMark::mark_and_follow)
+    //   crash on JDK 25. Parallel GC has no concurrent barriers, avoiding both bugs.
+    let gcFlags;
+    if (resolvedVersion && resolvedVersion >= 25) {
+      gcFlags = ['-XX:+UseParallelGC'];
+    } else {
+      gcFlags = ['-XX:+UseZGC'];
+    }
+    // Disable core dumps — a single crash writes a multi-GB file to the server directory
+    const coreFlags = ['-XX:-CreateCoredumpOnCrash'];
     const extraFlags = config.DEFAULT_JVM_FLAGS ? config.DEFAULT_JVM_FLAGS.split(/\s+/).filter(Boolean) : [];
 
     // In jar mode, prepend RAM, GC, and extra flags.
-    // In custom args mode, RAM is managed by the args files but GC flags still need injection.
+    // In custom args mode, RAM is managed by the args files but GC/core flags still need injection.
+    const jvmFlags = [...gcFlags, ...coreFlags, ...extraFlags];
     const args = isJarMode
-      ? [`-Xms${this.minRam}`, `-Xmx${this.maxRam}`, ...gcFlags, ...extraFlags, ...this.startArgs]
-      : [...gcFlags, ...extraFlags, ...this.startArgs];
+      ? [`-Xms${this.minRam}`, `-Xmx${this.maxRam}`, ...jvmFlags, ...this.startArgs]
+      : [...jvmFlags, ...this.startArgs];
 
     this.process = spawn(javaCmd, args, {
       cwd: this.directory,

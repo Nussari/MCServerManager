@@ -191,7 +191,7 @@ All settings are configurable via environment variables:
 
 ## How It Works
 
-- **Java auto-detection**: On start, the service reads the class file version from the server JAR's main class and selects the best matching JDK from the configured `JAVA_<version>` paths. GC is selected per JDK version: ZGC on JDK 21 to avoid a G1 crash ([JDK-8320253](https://bugs.openjdk.org/browse/JDK-8320253), not backported), default G1 on JDK 25+ (G1 bug fixed since 22; ZGC has its own crash in `ZMark::mark_and_follow`). GC flags are injected in both jar mode and custom args mode.
+- **Java auto-detection**: On start, the service reads the class file version from the server JAR's main class and selects the best matching JDK from the configured `JAVA_<version>` paths. GC is selected per JDK version: ZGC on JDK 21 to avoid a G1 crash ([JDK-8320253](https://bugs.openjdk.org/browse/JDK-8320253), not backported), Parallel GC on JDK 25+ (both G1 [JDK-8366580](https://bugs.openjdk.org/browse/JDK-8366580) and ZGC crash on 25). GC flags are injected in both jar mode and custom args mode. Core dumps are disabled to prevent multi-GB files from filling Docker volumes.
 - **Process management**: Each Minecraft server runs as a child process of the Node.js service. Stdin is piped for commands, stdout/stderr are captured for the console.
 - **Communication**: Real-time events use Socket.IO (WebSocket). Template and server import ZIP uploads use HTTP POST endpoints (`/api/upload-template`, `/api/import-server`) to support large files with streaming and progress tracking.
 - **Persistence**: Server registry is stored in `data/servers.json`. On service restart, all servers start in "stopped" state — you decide what to start.

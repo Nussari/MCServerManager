@@ -8,6 +8,8 @@ const ServerManager = require('./services/ServerManager');
 const { STATUS } = require('./services/MinecraftServer');
 const mojang = require('./utils/mojang');
 
+const pkg = require('../package.json');
+
 const app = express();
 const server = http.createServer(app);
 const io = new SocketIO(server, { maxHttpBufferSize: 5 * 1024 * 1024 });
@@ -15,6 +17,9 @@ const manager = new ServerManager();
 
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '../public')));
+
+// Version endpoint
+app.get('/api/version', (_req, res) => res.json({ version: pkg.version }));
 
 // HTTP template upload — streams ZIP to disk to avoid Socket.IO size limits
 app.post('/api/upload-template', async (req, res) => {
