@@ -1,6 +1,6 @@
 # Minecraft Server Manager
 
-A web dashboard for managing multiple Minecraft servers. Create servers from templates, import existing servers, start/stop them, and interact with the console in real-time — all from your browser.
+A web dashboard for managing multiple Minecraft servers. Create servers from templates, import existing servers, start/stop them, and interact with the console in real-time, all from your browser.
 
 ## Project Structure
 
