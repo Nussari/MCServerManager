@@ -13,6 +13,7 @@ serverService/
 │   │   └── ServerManager.js      # Orchestrates all servers (CRUD, persistence)
 │   └── utils/
 │       ├── config.js             # Environment-based configuration
+│       ├── javaDetect.js         # Auto-detect required Java version from JAR
 │       ├── mojang.js             # Mojang API client (version manifest + JAR download)
 │       └── properties.js         # server.properties file parser/writer
 ├── public/                       # Frontend (vanilla HTML/CSS/JS)
@@ -34,7 +35,7 @@ serverService/
 ## Prerequisites
 
 - **Node.js 20+**
-- **Java 21+** (for running Minecraft servers)
+- **Java 21+** (for running Minecraft servers; the Docker image bundles JDK 21 and 25)
 - At least one template with a server jar, or use the built-in "Latest Release" option to auto-download
 
 ## Quick Start
@@ -179,7 +180,8 @@ All settings are configurable via environment variables:
 | `SERVERS_DIR` | `./servers` | Where server instances are stored |
 | `TEMPLATES_DIR` | `./templates` | Where templates live |
 | `DATA_DIR` | `./data` | Where servers.json is stored |
-| `DEFAULT_JAVA` | `java` | Path to Java binary |
+| `DEFAULT_JAVA` | `java` | Path to Java binary (fallback when auto-detect is unavailable) |
+| `JAVA_<version>` | — | Path to a specific Java version (e.g. `JAVA_21=/opt/java/21/bin/java`). Used by auto-detection to pick the right JDK for each server JAR |
 | `DEFAULT_MIN_RAM` | `1024M` | Default -Xms for new servers |
 | `DEFAULT_MAX_RAM` | `6G` | Default -Xmx for new servers |
 | `CONSOLE_BUFFER_SIZE` | `500` | Lines of console output buffered per server |
@@ -188,6 +190,7 @@ All settings are configurable via environment variables:
 
 ## How It Works
 
+- **Java auto-detection**: On start, the service reads the class file version from the server JAR's main class and selects the best matching JDK from the configured `JAVA_<version>` paths. JDK 21 automatically uses ZGC instead of G1 to avoid a known G1 GC crash ([JDK-8320253](https://bugs.openjdk.org/browse/JDK-8320253)).
 - **Process management**: Each Minecraft server runs as a child process of the Node.js service. Stdin is piped for commands, stdout/stderr are captured for the console.
 - **Communication**: Real-time events use Socket.IO (WebSocket). Template and server import ZIP uploads use HTTP POST endpoints (`/api/upload-template`, `/api/import-server`) to support large files with streaming and progress tracking.
 - **Persistence**: Server registry is stored in `data/servers.json`. On service restart, all servers start in "stopped" state — you decide what to start.

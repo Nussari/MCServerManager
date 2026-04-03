@@ -3,6 +3,13 @@ const fs = require('fs');
 
 const ROOT_DIR = path.resolve(__dirname, '../..');
 
+// Parse JAVA_<version> env vars (e.g. JAVA_21=/opt/java/21/bin/java)
+const JAVA_VERSIONS = {};
+for (const [key, value] of Object.entries(process.env)) {
+  const m = key.match(/^JAVA_(\d+)$/);
+  if (m) JAVA_VERSIONS[parseInt(m[1])] = value;
+}
+
 const config = {
   PORT: parseInt(process.env.PORT, 10) || 3000,
   SERVERS_DIR: process.env.SERVERS_DIR || path.join(ROOT_DIR, 'servers'),
@@ -14,6 +21,7 @@ const config = {
   CONSOLE_BUFFER_SIZE: parseInt(process.env.CONSOLE_BUFFER_SIZE, 10) || 500,
   STOP_TIMEOUT_MS: parseInt(process.env.STOP_TIMEOUT_MS, 10) || 30000,
   BASE_MC_PORT: parseInt(process.env.BASE_MC_PORT, 10) || 25565,
+  JAVA_VERSIONS,
 };
 
 // Ensure runtime directories exist

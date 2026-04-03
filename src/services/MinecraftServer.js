@@ -4,6 +4,7 @@ const readline = require('readline');
 const path = require('path');
 const fs = require('fs');
 const config = require('../utils/config');
+const { detectJavaVersion } = require('../utils/javaDetect');
 
 const STATUS = {
   STOPPED: 'stopped',
@@ -75,12 +76,32 @@ class MinecraftServer extends EventEmitter {
     this.players.clear();
     this.emit('status', this.getInfo());
 
-    // In jar mode, prepend RAM flags. In custom args mode, the args files manage JVM settings.
+    // Auto-detect Java version for jar mode
+    let javaCmd = this.javaPath;
+    let resolvedVersion = null;
+    if (isJarMode) {
+      const jarPath = path.join(this.directory, this.startArgs[1]);
+      const required = detectJavaVersion(jarPath);
+      if (required) {
+        const installed = Object.keys(config.JAVA_VERSIONS).map(Number).sort((a, b) => a - b);
+        const match = installed.find(v => v >= required);
+        if (match) {
+          javaCmd = config.JAVA_VERSIONS[match];
+          resolvedVersion = match;
+          this._pushOutput(`[SYSTEM] Detected Java ${required} required, using Java ${match}`, 'stderr');
+        }
+      }
+    }
+
+    // Use ZGC on JDK 21 to avoid G1 GC crash (JDK-8320253, fixed in JDK 22+ via JEP 423)
+    const gcFlags = resolvedVersion === 21 ? ['-XX:+UseZGC'] : [];
+
+    // In jar mode, prepend RAM and GC flags. In custom args mode, the args files manage JVM settings.
     const args = isJarMode
-      ? [`-Xms${this.minRam}`, `-Xmx${this.maxRam}`, ...this.startArgs]
+      ? [`-Xms${this.minRam}`, `-Xmx${this.maxRam}`, ...gcFlags, ...this.startArgs]
       : [...this.startArgs];
 
-    this.process = spawn(this.javaPath, args, {
+    this.process = spawn(javaCmd, args, {
       cwd: this.directory,
       stdio: ['pipe', 'pipe', 'pipe']
     });

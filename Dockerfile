@@ -1,10 +1,15 @@
-FROM eclipse-temurin:22-jre AS jre
+FROM eclipse-temurin:21-jre AS jre21
+FROM eclipse-temurin:25-jre AS jre25
 
 FROM node:20-slim
 
-ENV JAVA_HOME=/opt/java/openjdk
+COPY --from=jre21 /opt/java/openjdk /opt/java/21
+COPY --from=jre25 /opt/java/openjdk /opt/java/25
+
+ENV JAVA_HOME=/opt/java/25
 ENV PATH=$JAVA_HOME/bin:$PATH
-COPY --from=jre $JAVA_HOME $JAVA_HOME
+ENV JAVA_21=/opt/java/21/bin/java
+ENV JAVA_25=/opt/java/25/bin/java
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
