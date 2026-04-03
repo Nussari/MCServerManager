@@ -59,16 +59,19 @@ function renderGrid() {
 function loadTemplates() {
   socket.emit('list-templates', (templates) => {
     templateSelect.innerHTML = '';
+
+    // Always offer "Latest Release" as the first option
+    const latestOpt = document.createElement('option');
+    latestOpt.value = '__latest_release__';
+    latestOpt.textContent = 'Latest Release (Vanilla)';
+    templateSelect.appendChild(latestOpt);
+
     const ready = templates.filter(t => t.hasJar);
-    if (ready.length === 0) {
-      templateSelect.innerHTML = '<option value="" disabled selected>No templates with server jar found</option>';
-    } else {
-      for (const t of ready) {
-        const opt = document.createElement('option');
-        opt.value = t.name;
-        opt.textContent = t.name;
-        templateSelect.appendChild(opt);
-      }
+    for (const t of ready) {
+      const opt = document.createElement('option');
+      opt.value = t.name;
+      opt.textContent = t.name;
+      templateSelect.appendChild(opt);
     }
   });
 }
@@ -90,7 +93,7 @@ function closeModal() {
   modalOverlay.classList.remove('active');
 }
 
-form.onsubmit = (e) => {
+form.onsubmit = async (e) => {
   e.preventDefault();
   formError.textContent = '';
 
@@ -115,9 +118,64 @@ form.onsubmit = (e) => {
   if (!data.name) { formError.textContent = 'Name is required'; return; }
   if (!data.templateName) { formError.textContent = 'Select a template'; return; }
 
+  const createBtn = form.querySelector('button[type="submit"]');
+  const progressDiv = document.getElementById('download-progress');
+  const progressText = document.getElementById('download-progress-text');
+  const progressBar = document.getElementById('download-progress-bar');
+
+  // Handle "Latest Release" selection
+  if (data.templateName === '__latest_release__') {
+    createBtn.disabled = true;
+    createBtn.textContent = 'Fetching version...';
+
+    const releaseInfo = await new Promise((resolve) => {
+      socket.emit('fetch-latest-release', (res) => resolve(res));
+    });
+
+    if (!releaseInfo.ok) {
+      formError.textContent = releaseInfo.error;
+      createBtn.disabled = false;
+      createBtn.textContent = 'Create';
+      return;
+    }
+
+    data.templateName = releaseInfo.templateName;
+
+    if (!releaseInfo.cached) {
+      progressDiv.style.display = '';
+      progressText.textContent = `Downloading Vanilla ${releaseInfo.version} server...`;
+      progressBar.style.width = '0%';
+      createBtn.textContent = 'Downloading...';
+
+      data._latestRelease = {
+        jarUrl: releaseInfo.jarUrl,
+        sha1: releaseInfo.sha1,
+        templateName: releaseInfo.templateName,
+      };
+    } else {
+      createBtn.textContent = 'Creating...';
+    }
+  }
+
+  // Listen for download progress
+  const onProgress = ({ downloaded, total }) => {
+    const pct = total ? Math.round((downloaded / total) * 100) : 0;
+    progressBar.style.width = pct + '%';
+    progressText.textContent = `Downloading... ${pct}% (${Math.round(downloaded / 1024 / 1024)}MB / ${Math.round(total / 1024 / 1024)}MB)`;
+  };
+  socket.on('download-progress', onProgress);
+
+  createBtn.disabled = true;
+  if (createBtn.textContent === 'Create') createBtn.textContent = 'Creating...';
+
   socket.emit('create-server', data, async (res) => {
+    socket.off('download-progress', onProgress);
+    progressDiv.style.display = 'none';
+    progressBar.style.width = '0%';
+    createBtn.disabled = false;
+    createBtn.textContent = 'Create';
+
     if (res.ok) {
-      // Upload icon if selected
       const iconInput = document.getElementById('srv-icon');
       if (iconInput.files[0]) {
         const buf = await iconInput.files[0].arrayBuffer();

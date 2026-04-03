@@ -6,6 +6,7 @@ const path = require('path');
 const config = require('./utils/config');
 const ServerManager = require('./services/ServerManager');
 const { STATUS } = require('./services/MinecraftServer');
+const mojang = require('./utils/mojang');
 
 const app = express();
 const server = http.createServer(app);
@@ -96,9 +97,30 @@ io.on('connection', (socket) => {
     if (callback) callback(manager.getAvailableTemplates());
   });
 
-  // Server CRUD
-  socket.on('create-server', (data, callback) => {
+  socket.on('fetch-latest-release', async (callback) => {
     try {
+      const { version, jarUrl, sha1 } = await mojang.getLatestRelease();
+      const templateName = `Vanilla-${version}`;
+      const templateDir = path.join(config.TEMPLATES_DIR, templateName);
+      const cached = fs.existsSync(templateDir) && fs.existsSync(path.join(templateDir, 'server.jar'));
+      callback({ ok: true, version, jarUrl, sha1, templateName, cached });
+    } catch (err) {
+      callback({ ok: false, error: err.message });
+    }
+  });
+
+  // Server CRUD
+  socket.on('create-server', async (data, callback) => {
+    try {
+      if (data._latestRelease) {
+        const { jarUrl, sha1, templateName } = data._latestRelease;
+        data.templateName = await manager.ensureVanillaTemplate(
+          templateName.replace('Vanilla-', ''), jarUrl, sha1,
+          (progress) => socket.emit('download-progress', progress)
+        );
+        delete data._latestRelease;
+      }
+
       const info = manager.createServer(data);
       io.to('dashboard').emit('server-created', info);
       callback({ ok: true, server: info });

@@ -6,6 +6,7 @@ const AdmZip = require('adm-zip');
 const sharp = require('sharp');
 const config = require('../utils/config');
 const properties = require('../utils/properties');
+const mojang = require('../utils/mojang');
 const { MinecraftServer, STATUS } = require('./MinecraftServer');
 
 class ServerManager extends EventEmitter {
@@ -25,9 +26,9 @@ class ServerManager extends EventEmitter {
       }
     }
 
-    // Clean up any leftover temp upload directories
+    // Clean up any leftover temp upload/download directories
     for (const d of fs.readdirSync(config.TEMPLATES_DIR, { withFileTypes: true })) {
-      if (d.isDirectory() && d.name.startsWith('_uploading_')) {
+      if (d.isDirectory() && (d.name.startsWith('_uploading_') || d.name.startsWith('_downloading_'))) {
         fs.rmSync(path.join(config.TEMPLATES_DIR, d.name), { recursive: true, force: true });
       }
     }
@@ -587,7 +588,7 @@ class ServerManager extends EventEmitter {
 
   getAvailableTemplates() {
     return fs.readdirSync(config.TEMPLATES_DIR, { withFileTypes: true })
-      .filter(d => d.isDirectory() && d.name !== 'common' && !d.name.startsWith('_uploading_'))
+      .filter(d => d.isDirectory() && d.name !== 'common' && !d.name.startsWith('_uploading_') && !d.name.startsWith('_downloading_') && !d.name.startsWith('Vanilla-'))
       .map(d => {
         const templateJsonPath = path.join(config.TEMPLATES_DIR, d.name, 'template.json');
         let ready = fs.existsSync(path.join(config.TEMPLATES_DIR, d.name, 'server.jar'));
@@ -604,6 +605,34 @@ class ServerManager extends EventEmitter {
         }
         return { name: d.name, hasJar: ready };
       });
+  }
+
+  async ensureVanillaTemplate(version, jarUrl, sha1, onProgress) {
+    const templateName = `Vanilla-${version}`;
+    const templateDir = path.join(config.TEMPLATES_DIR, templateName);
+
+    // Cache hit — template already downloaded
+    if (fs.existsSync(templateDir) && fs.existsSync(path.join(templateDir, 'server.jar'))) {
+      return templateName;
+    }
+
+    // Concurrency guard
+    const tempDir = path.join(config.TEMPLATES_DIR, `_downloading_${templateName}`);
+    if (fs.existsSync(tempDir)) {
+      throw new Error('Download already in progress for this version');
+    }
+
+    fs.mkdirSync(tempDir, { recursive: true });
+    try {
+      await mojang.downloadServerJar(jarUrl, path.join(tempDir, 'server.jar'), sha1, onProgress);
+      fs.writeFileSync(path.join(tempDir, 'template.json'), JSON.stringify({ startArgs: ['-jar', 'server.jar', 'nogui'] }));
+      fs.renameSync(tempDir, templateDir);
+    } catch (err) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      throw err;
+    }
+
+    return templateName;
   }
 
   _wireEvents(server) {
