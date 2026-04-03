@@ -1,4 +1,4 @@
-FROM eclipse-temurin:21-jre AS jre
+FROM eclipse-temurin:22-jre AS jre
 
 FROM node:20-slim
 
