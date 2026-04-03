@@ -6,7 +6,7 @@ FROM node:20-slim
 COPY --from=jre21 /opt/java/openjdk /opt/java/21
 COPY --from=jre25 /opt/java/openjdk /opt/java/25
 
-ENV JAVA_HOME=/opt/java/25
+ENV JAVA_HOME=/opt/java/21
 ENV PATH=$JAVA_HOME/bin:$PATH
 ENV JAVA_21=/opt/java/21/bin/java
 ENV JAVA_25=/opt/java/25/bin/java

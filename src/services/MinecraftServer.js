@@ -76,29 +76,44 @@ class MinecraftServer extends EventEmitter {
     this.players.clear();
     this.emit('status', this.getInfo());
 
-    // Auto-detect Java version for jar mode
+    // Auto-detect Java version from server JAR
     let javaCmd = this.javaPath;
-    let resolvedVersion = null;
-    if (isJarMode) {
-      const jarPath = path.join(this.directory, this.startArgs[1]);
-      const required = detectJavaVersion(jarPath);
-      if (required) {
-        const installed = Object.keys(config.JAVA_VERSIONS).map(Number).sort((a, b) => a - b);
-        const match = installed.find(v => v >= required);
-        if (match) {
-          javaCmd = config.JAVA_VERSIONS[match];
-          resolvedVersion = match;
-          this._pushOutput(`[SYSTEM] Detected Java ${required} required, using Java ${match}`, 'stderr');
+    const installed = Object.keys(config.JAVA_VERSIONS).map(Number).sort((a, b) => a - b);
+    if (installed.length > 0) {
+      let detectJar = null;
+      if (isJarMode) {
+        detectJar = path.join(this.directory, this.startArgs[1]);
+      } else {
+        // Custom args mode (modded servers): try server.jar or first root-level JAR
+        const serverJar = path.join(this.directory, 'server.jar');
+        if (fs.existsSync(serverJar)) {
+          detectJar = serverJar;
+        } else {
+          const rootJar = fs.readdirSync(this.directory).find(f => f.endsWith('.jar'));
+          if (rootJar) detectJar = path.join(this.directory, rootJar);
+        }
+      }
+
+      if (detectJar && fs.existsSync(detectJar)) {
+        const required = detectJavaVersion(detectJar);
+        if (required) {
+          const match = installed.find(v => v >= required);
+          if (match) {
+            javaCmd = config.JAVA_VERSIONS[match];
+            this._pushOutput(`[SYSTEM] Detected Java ${required} required, using Java ${match}`, 'stderr');
+          }
         }
       }
     }
 
-    // Use ZGC on JDK 21 to avoid G1 GC crash (JDK-8320253, fixed in JDK 22+ via JEP 423)
-    const gcFlags = resolvedVersion === 21 ? ['-XX:+UseZGC'] : [];
+    // Use ZGC universally: avoids G1 GC crash on JDK 21 (JDK-8320253) and
+    // changes C2 IR graph shapes on JDK 25 to avoid register allocator crash (JDK-8146466)
+    const gcFlags = ['-XX:+UseZGC'];
+    const extraFlags = config.DEFAULT_JVM_FLAGS ? config.DEFAULT_JVM_FLAGS.split(/\s+/).filter(Boolean) : [];
 
-    // In jar mode, prepend RAM and GC flags. In custom args mode, the args files manage JVM settings.
+    // In jar mode, prepend RAM, GC, and extra flags. In custom args mode, the args files manage JVM settings.
     const args = isJarMode
-      ? [`-Xms${this.minRam}`, `-Xmx${this.maxRam}`, ...gcFlags, ...this.startArgs]
+      ? [`-Xms${this.minRam}`, `-Xmx${this.maxRam}`, ...gcFlags, ...extraFlags, ...this.startArgs]
       : [...this.startArgs];
 
     this.process = spawn(javaCmd, args, {

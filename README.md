@@ -187,10 +187,11 @@ All settings are configurable via environment variables:
 | `CONSOLE_BUFFER_SIZE` | `500` | Lines of console output buffered per server |
 | `STOP_TIMEOUT_MS` | `30000` | Milliseconds to wait for graceful stop before force-killing |
 | `BASE_MC_PORT` | `25565` | Starting port for auto-assignment |
+| `DEFAULT_JVM_FLAGS` | — | Extra JVM flags appended to all servers in jar mode (e.g. `-XX:+AlwaysPreTouch`). If you encounter JIT crashes, set to `-XX:TieredStopAtLevel=3` to disable C2 |
 
 ## How It Works
 
-- **Java auto-detection**: On start, the service reads the class file version from the server JAR's main class and selects the best matching JDK from the configured `JAVA_<version>` paths. JDK 21 automatically uses ZGC instead of G1 to avoid a known G1 GC crash ([JDK-8320253](https://bugs.openjdk.org/browse/JDK-8320253)).
+- **Java auto-detection**: On start, the service reads the class file version from the server JAR's main class and selects the best matching JDK from the configured `JAVA_<version>` paths. ZGC is used instead of G1 to avoid known JVM crashes ([JDK-8320253](https://bugs.openjdk.org/browse/JDK-8320253), [JDK-8146466](https://bugs.openjdk.org/browse/JDK-8146466)).
 - **Process management**: Each Minecraft server runs as a child process of the Node.js service. Stdin is piped for commands, stdout/stderr are captured for the console.
 - **Communication**: Real-time events use Socket.IO (WebSocket). Template and server import ZIP uploads use HTTP POST endpoints (`/api/upload-template`, `/api/import-server`) to support large files with streaming and progress tracking.
 - **Persistence**: Server registry is stored in `data/servers.json`. On service restart, all servers start in "stopped" state — you decide what to start.

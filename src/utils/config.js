@@ -21,6 +21,7 @@ const config = {
   CONSOLE_BUFFER_SIZE: parseInt(process.env.CONSOLE_BUFFER_SIZE, 10) || 500,
   STOP_TIMEOUT_MS: parseInt(process.env.STOP_TIMEOUT_MS, 10) || 30000,
   BASE_MC_PORT: parseInt(process.env.BASE_MC_PORT, 10) || 25565,
+  DEFAULT_JVM_FLAGS: process.env.DEFAULT_JVM_FLAGS || '',
   JAVA_VERSIONS,
 };
 
