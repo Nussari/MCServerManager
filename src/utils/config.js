@@ -10,7 +10,7 @@ const config = {
   DATA_DIR: process.env.DATA_DIR || path.join(ROOT_DIR, 'data'),
   DEFAULT_JAVA: process.env.DEFAULT_JAVA || 'java',
   DEFAULT_MIN_RAM: process.env.DEFAULT_MIN_RAM || '1024M',
-  DEFAULT_MAX_RAM: process.env.DEFAULT_MAX_RAM || '1024M',
+  DEFAULT_MAX_RAM: process.env.DEFAULT_MAX_RAM || '6G',
   CONSOLE_BUFFER_SIZE: parseInt(process.env.CONSOLE_BUFFER_SIZE, 10) || 500,
   STOP_TIMEOUT_MS: parseInt(process.env.STOP_TIMEOUT_MS, 10) || 30000,
   BASE_MC_PORT: parseInt(process.env.BASE_MC_PORT, 10) || 25565,

@@ -181,7 +181,7 @@ All settings are configurable via environment variables:
 | `DATA_DIR` | `./data` | Where servers.json is stored |
 | `DEFAULT_JAVA` | `java` | Path to Java binary |
 | `DEFAULT_MIN_RAM` | `1024M` | Default -Xms for new servers |
-| `DEFAULT_MAX_RAM` | `1024M` | Default -Xmx for new servers |
+| `DEFAULT_MAX_RAM` | `6G` | Default -Xmx for new servers |
 | `CONSOLE_BUFFER_SIZE` | `500` | Lines of console output buffered per server |
 | `STOP_TIMEOUT_MS` | `30000` | Milliseconds to wait for graceful stop before force-killing |
 | `BASE_MC_PORT` | `25565` | Starting port for auto-assignment |
