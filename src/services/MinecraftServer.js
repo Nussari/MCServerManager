@@ -123,7 +123,7 @@ class MinecraftServer extends EventEmitter {
     // In custom args mode, RAM is managed by the args files but GC/core flags still need injection.
     const jvmFlags = [...gcFlags, ...coreFlags, ...extraFlags];
     const args = isJarMode
-      ? [`-Xms${this.minRam}`, `-Xmx${this.maxRam}`, ...jvmFlags, ...this.startArgs]
+      ? [`-Xms${this.maxRam}`, `-Xmx${this.maxRam}`, ...jvmFlags, ...this.startArgs]
       : [...jvmFlags, ...this.startArgs];
 
     this.process = spawn(javaCmd, args, {
