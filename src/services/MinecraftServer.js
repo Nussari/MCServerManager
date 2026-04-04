@@ -108,16 +108,12 @@ class MinecraftServer extends EventEmitter {
       }
     }
 
-    // GC selection depends on Java version:
-    // - JDK 21: Use ZGC to avoid G1 GC crash (JDK-8320253, not backported to 21)
-    // - JDK 25+: Use Parallel GC — both G1 (JDK-8366580) and ZGC (ZMark::mark_and_follow)
-    //   crash on JDK 25. Parallel GC has no concurrent barriers, avoiding both bugs.
-    let gcFlags;
-    if (resolvedVersion && resolvedVersion >= 25) {
-      gcFlags = ['-XX:+UseParallelGC'];
-    } else {
-      gcFlags = ['-XX:+UseZGC'];
-    }
+    // GC selection: Use Parallel GC universally.
+    // - JDK 21: G1 crashes (JDK-8320253, not backported) and ZGC crashes
+    //   (XBarrier::mark_barrier_on_oop_slow_path SIGSEGV with modded servers).
+    // - JDK 25: G1 (JDK-8366580) and ZGC (ZMark::mark_and_follow) both crash.
+    // Parallel GC is stop-the-world with no concurrent barriers, avoiding all of these.
+    const gcFlags = ['-XX:+UseParallelGC'];
     // Disable core dumps — a single crash writes a multi-GB file to the server directory
     const coreFlags = ['-XX:-CreateCoredumpOnCrash'];
     const extraFlags = config.DEFAULT_JVM_FLAGS ? config.DEFAULT_JVM_FLAGS.split(/\s+/).filter(Boolean) : [];
