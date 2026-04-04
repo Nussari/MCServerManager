@@ -108,12 +108,13 @@ class MinecraftServer extends EventEmitter {
       }
     }
 
-    // GC selection: Use Parallel GC universally.
-    // - JDK 21: G1 crashes (JDK-8320253, not backported) and ZGC crashes
-    //   (XBarrier::mark_barrier_on_oop_slow_path SIGSEGV with modded servers).
-    // - JDK 25: G1 (JDK-8366580) and ZGC (ZMark::mark_and_follow) both crash.
-    // Parallel GC is stop-the-world with no concurrent barriers, avoiding all of these.
-    const gcFlags = ['-XX:+UseParallelGC'];
+    // GC selection: Use Shenandoah GC universally.
+    // - G1 crashes on JDK 21 (JDK-8320253, not backported) and JDK 25 (JDK-8366580).
+    // - ZGC crashes on JDK 21 (XBarrier SIGSEGV) and JDK 25 (ZMark::mark_and_follow).
+    // - Parallel GC avoids crashes but causes multi-second stop-the-world pauses
+    //   that freeze the server thread ("Can't keep up!" warnings).
+    // Shenandoah is concurrent (low-pause) and a separate codebase from G1/ZGC.
+    const gcFlags = ['-XX:+UseShenandoahGC'];
     // Disable core dumps — a single crash writes a multi-GB file to the server directory
     const coreFlags = ['-XX:-CreateCoredumpOnCrash'];
     const extraFlags = config.DEFAULT_JVM_FLAGS ? config.DEFAULT_JVM_FLAGS.split(/\s+/).filter(Boolean) : [];
