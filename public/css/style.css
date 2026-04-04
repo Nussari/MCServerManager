@@ -29,8 +29,8 @@ body {
 /* Version label */
 .version-label {
   position: fixed;
-  top: 6px;
-  left: 8px;
+  bottom: 8px;
+  right: 8px;
   font-size: 0.65rem;
   color: #555;
   z-index: 1000;
