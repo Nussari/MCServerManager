@@ -140,13 +140,17 @@ class MinecraftServer extends EventEmitter {
     const gcFlags = AIKAR_G1_FLAGS.filter(flag =>
       flag !== '-XX:+ParallelRefProcEnabled' || !resolvedVersion || resolvedVersion <= 21
     );
+    // Skip the C1 (quick) compiler — go straight to C2. Avoids C1 codegen bugs
+    // that cause SIGSEGV in compiled lambdas (e.g. DataFixerUpper Schema$$Lambda).
+    // Slightly slower startup, same or better steady-state performance.
+    const compilerFlags = ['-XX:-TieredCompilation'];
     const coreFlags = ['-XX:-CreateCoredumpOnCrash'];
     const extraFlags = config.DEFAULT_JVM_FLAGS ? config.DEFAULT_JVM_FLAGS.split(/\s+/).filter(Boolean) : [];
 
     // Prepend RAM, GC, core, and extra flags for all server types.
     // RAM flags come first so that if a custom args file also sets -Xmx,
     // the JVM uses the last occurrence (user override wins).
-    const jvmFlags = [`-Xms${this.maxRam}`, `-Xmx${this.maxRam}`, ...gcFlags, ...coreFlags, ...extraFlags];
+    const jvmFlags = [`-Xms${this.maxRam}`, `-Xmx${this.maxRam}`, ...gcFlags, ...compilerFlags, ...coreFlags, ...extraFlags];
     const args = [...jvmFlags, ...this.startArgs];
 
     this.process = spawn(javaCmd, args, {
