@@ -187,11 +187,11 @@ All settings are configurable via environment variables:
 | `CONSOLE_BUFFER_SIZE` | `500` | Lines of console output buffered per server |
 | `STOP_TIMEOUT_MS` | `30000` | Milliseconds to wait for graceful stop before force-killing |
 | `BASE_MC_PORT` | `25565` | Starting port for auto-assignment |
-| `DEFAULT_JVM_FLAGS` | — | Extra JVM flags appended to all servers in jar mode (e.g. `-XX:+AlwaysPreTouch`). If you encounter JIT crashes, set to `-XX:TieredStopAtLevel=3` to disable C2 |
+| `DEFAULT_JVM_FLAGS` | — | Extra JVM flags appended after Aikar's G1GC flags for all servers (e.g. `-XX:TieredStopAtLevel=3` to disable C2 if you encounter JIT crashes). User flags are applied last, so they override Aikar defaults |
 
 ## How It Works
 
-- **Java auto-detection**: On start, the service reads the class file version from the server JAR's main class and selects the best matching JDK from the configured `JAVA_<version>` paths. Shenandoah GC is used universally — G1 and ZGC both have unpatched SIGSEGV bugs on JDK 21 ([JDK-8320253](https://bugs.openjdk.org/browse/JDK-8320253)) and JDK 25 ([JDK-8366580](https://bugs.openjdk.org/browse/JDK-8366580)), and Parallel GC causes multi-second stop-the-world pauses. GC flags are injected in both jar mode and custom args mode. Core dumps are disabled to prevent multi-GB files from filling Docker volumes.
+- **Java auto-detection**: On start, the service reads the class file version from the server JAR's main class and selects the best matching JDK from the configured `JAVA_<version>` paths. G1GC with [Aikar's tuning flags](https://docs.papermc.io/paper/aikars-flags) is used for all servers — the industry standard for Minecraft. These flags tune G1 for Minecraft's allocation patterns (high short-lived object churn) to minimize GC pauses. GC flags are injected in both jar mode and custom args mode. `-XX:+ParallelRefProcEnabled` is automatically filtered out on JDK 22+ where it was removed. Core dumps are disabled to prevent multi-GB files from filling Docker volumes.
 - **Process management**: Each Minecraft server runs as a child process of the Node.js service. Stdin is piped for commands, stdout/stderr are captured for the console.
 - **Communication**: Real-time events use Socket.IO (WebSocket). Template and server import ZIP uploads use HTTP POST endpoints (`/api/upload-template`, `/api/import-server`) to support large files with streaming and progress tracking.
 - **Persistence**: Server registry is stored in `data/servers.json`. On service restart, all servers start in "stopped" state — you decide what to start.

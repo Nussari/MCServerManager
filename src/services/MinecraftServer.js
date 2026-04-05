@@ -18,6 +18,30 @@ const DONE_PATTERN = /Done \(\d+\.\d+s\)!/;
 const PLAYER_JOIN_PATTERN = /: (.+) joined the game/;
 const PLAYER_LEAVE_PATTERN = /: (.+) left the game/;
 
+// Aikar's G1GC tuning flags, the industry standard for Minecraft servers.
+// Tunes G1 for Minecraft's allocation patterns (high short-lived object churn).
+// https://docs.papermc.io/paper/aikars-flags
+const AIKAR_G1_FLAGS = [
+  '-XX:+UseG1GC',
+  '-XX:+ParallelRefProcEnabled',
+  '-XX:MaxGCPauseMillis=200',
+  '-XX:+UnlockExperimentalVMOptions',
+  '-XX:+DisableExplicitGC',
+  '-XX:+AlwaysPreTouch',
+  '-XX:G1NewSizePercent=30',
+  '-XX:G1MaxNewSizePercent=40',
+  '-XX:G1HeapRegionSize=8M',
+  '-XX:G1ReservePercent=20',
+  '-XX:G1HeapWastePercent=5',
+  '-XX:G1MixedGCCountTarget=4',
+  '-XX:InitiatingHeapOccupancyPercent=15',
+  '-XX:G1MixedGCLiveThresholdPercent=90',
+  '-XX:G1RSetUpdatingPauseTimePercent=5',
+  '-XX:SurvivorRatio=32',
+  '-XX:+PerfDisableSharedMem',
+  '-XX:MaxTenuringThreshold=1',
+];
+
 class MinecraftServer extends EventEmitter {
   constructor({ id, name, templateName, directory, port, javaPath, minRam, maxRam, startArgs, serverJar, createdAt }) {
     super();
@@ -108,19 +132,19 @@ class MinecraftServer extends EventEmitter {
       }
     }
 
-    // GC selection: Use Shenandoah GC universally.
-    // - G1 crashes on JDK 21 (JDK-8320253, not backported) and JDK 25 (JDK-8366580).
-    // - ZGC crashes on JDK 21 (XBarrier SIGSEGV) and JDK 25 (ZMark::mark_and_follow).
-    // - Parallel GC avoids crashes but causes multi-second stop-the-world pauses
-    //   that freeze the server thread ("Can't keep up!" warnings).
-    // Shenandoah is concurrent (low-pause) and a separate codebase from G1/ZGC.
-    const gcFlags = ['-XX:+UseShenandoahGC'];
-    // Disable core dumps — a single crash writes a multi-GB file to the server directory
+    // GC selection: G1GC with Aikar's Minecraft-tuned flags.
+    // G1 is the JDK default and the industry standard for Minecraft servers.
+    // History: ZGC crashed (SIGSEGV), Shenandoah crashed (SymbolTable corruption
+    // on player join), Parallel GC caused multi-second STW freezes. See git log.
+    // -XX:+ParallelRefProcEnabled was removed in JDK 23+; filter it on newer JDKs.
+    const gcFlags = AIKAR_G1_FLAGS.filter(flag =>
+      flag !== '-XX:+ParallelRefProcEnabled' || !resolvedVersion || resolvedVersion <= 21
+    );
     const coreFlags = ['-XX:-CreateCoredumpOnCrash'];
     const extraFlags = config.DEFAULT_JVM_FLAGS ? config.DEFAULT_JVM_FLAGS.split(/\s+/).filter(Boolean) : [];
 
-    // In jar mode, prepend RAM, GC, and extra flags.
-    // In custom args mode, RAM is managed by the args files but GC/core flags still need injection.
+    // Prepend GC, core, and extra flags. Jar mode also gets RAM flags;
+    // custom args mode relies on the server's own args files for RAM.
     const jvmFlags = [...gcFlags, ...coreFlags, ...extraFlags];
     const args = isJarMode
       ? [`-Xms${this.maxRam}`, `-Xmx${this.maxRam}`, ...jvmFlags, ...this.startArgs]
