@@ -143,12 +143,11 @@ class MinecraftServer extends EventEmitter {
     const coreFlags = ['-XX:-CreateCoredumpOnCrash'];
     const extraFlags = config.DEFAULT_JVM_FLAGS ? config.DEFAULT_JVM_FLAGS.split(/\s+/).filter(Boolean) : [];
 
-    // Prepend GC, core, and extra flags. Jar mode also gets RAM flags;
-    // custom args mode relies on the server's own args files for RAM.
-    const jvmFlags = [...gcFlags, ...coreFlags, ...extraFlags];
-    const args = isJarMode
-      ? [`-Xms${this.maxRam}`, `-Xmx${this.maxRam}`, ...jvmFlags, ...this.startArgs]
-      : [...jvmFlags, ...this.startArgs];
+    // Prepend RAM, GC, core, and extra flags for all server types.
+    // RAM flags come first so that if a custom args file also sets -Xmx,
+    // the JVM uses the last occurrence (user override wins).
+    const jvmFlags = [`-Xms${this.maxRam}`, `-Xmx${this.maxRam}`, ...gcFlags, ...coreFlags, ...extraFlags];
+    const args = [...jvmFlags, ...this.startArgs];
 
     this.process = spawn(javaCmd, args, {
       cwd: this.directory,
