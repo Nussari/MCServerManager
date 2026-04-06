@@ -475,12 +475,16 @@ function refreshViewTemplatesList() {
       <div class="template-list-row" data-name="${esc(t.name)}">
         <span class="template-list-name">${esc(t.name)}</span>
         <span class="template-list-status ${t.hasJar ? 'ready' : 'not-ready'}">${t.hasJar ? 'Ready' : 'Not ready'}</span>
+        <button class="btn btn-secondary btn-sm template-mods-btn" data-name="${esc(t.name)}">Mods</button>
         <button class="btn btn-danger btn-sm delete-template-btn" data-name="${esc(t.name)}">Delete</button>
       </div>
     `).join('');
 
     viewTemplatesList.querySelectorAll('.delete-template-btn').forEach(btn => {
       btn.onclick = () => deleteTemplate(btn.dataset.name, btn);
+    });
+    viewTemplatesList.querySelectorAll('.template-mods-btn').forEach(btn => {
+      btn.onclick = () => openTemplateModsModal(btn.dataset.name);
     });
   });
 }
@@ -512,6 +516,103 @@ document.addEventListener('click', () => {
   navSecondaryActions.classList.remove('open');
   hamburgerBtn.setAttribute('aria-expanded', 'false');
 });
+
+// --- Template Mods Modal ---
+const tplModsModalOverlay = document.getElementById('template-mods-modal-overlay');
+const tplModList = document.getElementById('tpl-mod-list');
+const tplModError = document.getElementById('tpl-mod-error');
+const tplModUploadBtn = document.getElementById('tpl-mod-upload-btn');
+const tplModUploadStatus = document.getElementById('tpl-mod-upload-status');
+const tplModFilesInput = document.getElementById('tpl-mod-files');
+
+let currentModsTemplateName = null;
+
+document.getElementById('close-template-mods-modal').onclick = closeTemplateModsModal;
+tplModsModalOverlay.onclick = (e) => { if (e.target === tplModsModalOverlay) closeTemplateModsModal(); };
+
+function openTemplateModsModal(name) {
+  currentModsTemplateName = name;
+  document.getElementById('template-mods-title').textContent = `Mods — ${name}`;
+  tplModError.textContent = '';
+  tplModUploadStatus.textContent = '';
+  tplModFilesInput.value = '';
+  tplModsModalOverlay.classList.add('active');
+  refreshTemplateModList();
+}
+
+function closeTemplateModsModal() {
+  tplModsModalOverlay.classList.remove('active');
+  currentModsTemplateName = null;
+}
+
+function refreshTemplateModList() {
+  tplModList.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem">Loading...</p>';
+  socket.emit('list-template-mods', { name: currentModsTemplateName }, (res) => {
+    if (!res.ok) { tplModList.innerHTML = ''; tplModError.textContent = res.error; return; }
+    if (res.mods.length === 0) {
+      tplModList.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem">No mods installed.</p>';
+      return;
+    }
+    tplModList.innerHTML = res.mods.map(m => `
+      <div class="mod-list-row">
+        <span class="mod-list-name">${esc(m)}</span>
+        <button class="btn btn-danger btn-sm delete-tpl-mod-btn" data-filename="${esc(m)}">Delete</button>
+      </div>
+    `).join('');
+    tplModList.querySelectorAll('.delete-tpl-mod-btn').forEach(btn => {
+      btn.onclick = () => deleteTemplateMod(btn.dataset.filename, btn);
+    });
+  });
+}
+
+function deleteTemplateMod(filename, btn) {
+  if (!confirm(`Delete mod "${filename}"?`)) return;
+  btn.disabled = true;
+  socket.emit('delete-template-mod', { name: currentModsTemplateName, filename }, (res) => {
+    if (res.ok) {
+      refreshTemplateModList();
+    } else {
+      tplModError.textContent = res.error;
+      btn.disabled = false;
+    }
+  });
+}
+
+tplModUploadBtn.onclick = async () => {
+  const files = tplModFilesInput.files;
+  if (!files || files.length === 0) { tplModError.textContent = 'Select at least one .jar file'; return; }
+  tplModError.textContent = '';
+  tplModUploadBtn.disabled = true;
+
+  let uploaded = 0;
+  for (const file of files) {
+    if (!file.name.endsWith('.jar')) {
+      tplModError.textContent = `Skipped "${file.name}" — only .jar files allowed`;
+      continue;
+    }
+    tplModUploadStatus.textContent = `Uploading ${uploaded + 1}/${files.length}...`;
+    try {
+      const res = await fetch(`/api/upload-mods?type=template&name=${encodeURIComponent(currentModsTemplateName)}&filename=${encodeURIComponent(file.name)}`, {
+        method: 'POST',
+        body: file,
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        tplModError.textContent = `Failed "${file.name}": ${data.error}`;
+        break;
+      }
+      uploaded++;
+    } catch (err) {
+      tplModError.textContent = `Upload failed: ${err.message}`;
+      break;
+    }
+  }
+
+  tplModUploadBtn.disabled = false;
+  tplModUploadStatus.textContent = uploaded > 0 ? `${uploaded} mod(s) uploaded` : '';
+  tplModFilesInput.value = '';
+  refreshTemplateModList();
+};
 
 document.getElementById('confirm-import').onclick = () => {
   const customArgs = document.getElementById('imp-custom-args').value.trim();

@@ -180,6 +180,99 @@ function populateEditForm(s) {
   ramSelect.value = String(clampedRam);
 }
 
+// --- Mods Modal ---
+const modsModalOverlay = document.getElementById('mods-modal-overlay');
+const modList = document.getElementById('mod-list');
+const modError = document.getElementById('mod-error');
+const modUploadBtn = document.getElementById('mod-upload-btn');
+const modUploadStatus = document.getElementById('mod-upload-status');
+const modFilesInput = document.getElementById('mod-files');
+
+document.getElementById('btn-mods').onclick = openModsModal;
+document.getElementById('close-mods-modal').onclick = closeModsModal;
+modsModalOverlay.onclick = (e) => { if (e.target === modsModalOverlay) closeModsModal(); };
+
+function openModsModal() {
+  modError.textContent = '';
+  modUploadStatus.textContent = '';
+  modFilesInput.value = '';
+  modsModalOverlay.classList.add('active');
+  refreshModList();
+}
+
+function closeModsModal() {
+  modsModalOverlay.classList.remove('active');
+}
+
+function refreshModList() {
+  modList.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem">Loading...</p>';
+  socket.emit('list-server-mods', { serverId }, (res) => {
+    if (!res.ok) { modList.innerHTML = ''; modError.textContent = res.error; return; }
+    if (res.mods.length === 0) {
+      modList.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem">No mods installed.</p>';
+      return;
+    }
+    modList.innerHTML = res.mods.map(m => `
+      <div class="mod-list-row">
+        <span class="mod-list-name">${esc(m)}</span>
+        <button class="btn btn-danger btn-sm delete-mod-btn" data-filename="${esc(m)}">Delete</button>
+      </div>
+    `).join('');
+    modList.querySelectorAll('.delete-mod-btn').forEach(btn => {
+      btn.onclick = () => deleteMod(btn.dataset.filename, btn);
+    });
+  });
+}
+
+function deleteMod(filename, btn) {
+  if (!confirm(`Delete mod "${filename}"?`)) return;
+  btn.disabled = true;
+  socket.emit('delete-server-mod', { serverId, filename }, (res) => {
+    if (res.ok) {
+      refreshModList();
+    } else {
+      modError.textContent = res.error;
+      btn.disabled = false;
+    }
+  });
+}
+
+modUploadBtn.onclick = async () => {
+  const files = modFilesInput.files;
+  if (!files || files.length === 0) { modError.textContent = 'Select at least one .jar file'; return; }
+  modError.textContent = '';
+  modUploadBtn.disabled = true;
+
+  let uploaded = 0;
+  for (const file of files) {
+    if (!file.name.endsWith('.jar')) {
+      modError.textContent = `Skipped "${file.name}" — only .jar files allowed`;
+      continue;
+    }
+    modUploadStatus.textContent = `Uploading ${uploaded + 1}/${files.length}...`;
+    try {
+      const res = await fetch(`/api/upload-mods?type=server&id=${encodeURIComponent(serverId)}&filename=${encodeURIComponent(file.name)}`, {
+        method: 'POST',
+        body: file,
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        modError.textContent = `Failed "${file.name}": ${data.error}`;
+        break;
+      }
+      uploaded++;
+    } catch (err) {
+      modError.textContent = `Upload failed: ${err.message}`;
+      break;
+    }
+  }
+
+  modUploadBtn.disabled = false;
+  modUploadStatus.textContent = uploaded > 0 ? `${uploaded} mod(s) uploaded` : '';
+  modFilesInput.value = '';
+  refreshModList();
+};
+
 editForm.onsubmit = (e) => {
   e.preventDefault();
   editFormError.textContent = '';

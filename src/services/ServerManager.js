@@ -540,6 +540,66 @@ class ServerManager extends EventEmitter {
     }
   }
 
+  // --- Mods management ---
+
+  getServerMods(id) {
+    const server = this.getServer(id);
+    const modsDir = path.join(server.directory, 'mods');
+    if (!fs.existsSync(modsDir)) return [];
+    return fs.readdirSync(modsDir)
+      .filter(f => f.endsWith('.jar'))
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  deleteServerMod(id, filename) {
+    const server = this.getServer(id);
+    if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      throw new Error('Invalid filename');
+    }
+    const modPath = path.join(server.directory, 'mods', filename);
+    if (!fs.existsSync(modPath)) throw new Error('Mod not found');
+    fs.rmSync(modPath);
+  }
+
+  getTemplateMods(name) {
+    if (!name || !/^[a-zA-Z0-9._-]+$/.test(name)) throw new Error('Invalid template name');
+    const templateDir = path.join(config.TEMPLATES_DIR, name);
+    if (!fs.existsSync(templateDir)) throw new Error(`Template not found: ${name}`);
+    const modsDir = path.join(templateDir, 'mods');
+    if (!fs.existsSync(modsDir)) return [];
+    return fs.readdirSync(modsDir)
+      .filter(f => f.endsWith('.jar'))
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  deleteTemplateMod(name, filename) {
+    if (!name || !/^[a-zA-Z0-9._-]+$/.test(name)) throw new Error('Invalid template name');
+    if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      throw new Error('Invalid filename');
+    }
+    const templateDir = path.join(config.TEMPLATES_DIR, name);
+    if (!fs.existsSync(templateDir)) throw new Error(`Template not found: ${name}`);
+    const modPath = path.join(templateDir, 'mods', filename);
+    if (!fs.existsSync(modPath)) throw new Error('Mod not found');
+    fs.rmSync(modPath);
+  }
+
+  getServerModsDir(id) {
+    const server = this.getServer(id);
+    const modsDir = path.join(server.directory, 'mods');
+    if (!fs.existsSync(modsDir)) fs.mkdirSync(modsDir, { recursive: true });
+    return modsDir;
+  }
+
+  getTemplateModsDir(name) {
+    if (!name || !/^[a-zA-Z0-9._-]+$/.test(name)) throw new Error('Invalid template name');
+    const templateDir = path.join(config.TEMPLATES_DIR, name);
+    if (!fs.existsSync(templateDir)) throw new Error(`Template not found: ${name}`);
+    const modsDir = path.join(templateDir, 'mods');
+    if (!fs.existsSync(modsDir)) fs.mkdirSync(modsDir, { recursive: true });
+    return modsDir;
+  }
+
   // --- Existing methods ---
 
   async deleteServer(id) {

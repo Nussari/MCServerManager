@@ -271,6 +271,24 @@
     </div>
   </div>
 
+  <!-- Template Mods Modal -->
+  <div class="modal-overlay" id="template-mods-modal-overlay">
+    <div class="modal">
+      <h2 id="template-mods-title">Manage Mods</h2>
+      <div class="form-group">
+        <label for="tpl-mod-files">Add Mods (.jar files)</label>
+        <input type="file" id="tpl-mod-files" accept=".jar" multiple>
+      </div>
+      <button class="btn btn-primary btn-sm" id="tpl-mod-upload-btn" style="margin-bottom:16px">Upload</button>
+      <span class="mod-upload-status" id="tpl-mod-upload-status" style="font-size:0.8rem;color:var(--text-muted);margin-left:8px"></span>
+      <div id="tpl-mod-list" style="min-height:40px"></div>
+      <div class="form-error" id="tpl-mod-error"></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="close-template-mods-modal">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/utils.js"></script>
   <script src="/js/dashboard.js"></script>

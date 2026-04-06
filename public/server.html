@@ -22,6 +22,7 @@
       <button class="btn btn-primary" id="btn-start" style="display:none">Start</button>
       <button class="btn btn-danger" id="btn-stop" style="display:none">Stop</button>
       <button class="btn btn-secondary" id="btn-edit">Edit</button>
+      <button class="btn btn-secondary" id="btn-mods">Mods</button>
     </div>
 
     <div class="console-container" style="margin-top:16px; position:relative">
@@ -138,6 +139,25 @@
           <button type="submit" class="btn btn-primary">Save</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Mods Modal -->
+  <div class="modal-overlay" id="mods-modal-overlay">
+    <div class="modal">
+      <h2>Manage Mods</h2>
+      <div class="notice">Mod changes require a server restart to take effect.</div>
+      <div class="form-group">
+        <label for="mod-files">Add Mods (.jar files)</label>
+        <input type="file" id="mod-files" accept=".jar" multiple>
+      </div>
+      <button class="btn btn-primary btn-sm" id="mod-upload-btn" style="margin-bottom:16px">Upload</button>
+      <span class="mod-upload-status" id="mod-upload-status" style="font-size:0.8rem;color:var(--text-muted);margin-left:8px"></span>
+      <div id="mod-list" style="min-height:40px"></div>
+      <div class="form-error" id="mod-error"></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="close-mods-modal">Close</button>
+      </div>
     </div>
   </div>
 

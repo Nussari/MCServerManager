@@ -73,6 +73,46 @@ app.post('/api/import-server', async (req, res) => {
   }
 });
 
+// HTTP mod upload — streams JAR file to server or template mods folder
+app.post('/api/upload-mods', async (req, res) => {
+  const { type, id, name, filename } = req.query;
+
+  if (!filename || !filename.endsWith('.jar')) {
+    return res.json({ ok: false, error: 'Only .jar files are allowed' });
+  }
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    return res.json({ ok: false, error: 'Invalid filename' });
+  }
+
+  let modsDir;
+  try {
+    if (type === 'server') {
+      modsDir = manager.getServerModsDir(id);
+    } else if (type === 'template') {
+      modsDir = manager.getTemplateModsDir(name);
+    } else {
+      return res.json({ ok: false, error: 'Invalid type (must be "server" or "template")' });
+    }
+  } catch (err) {
+    return res.json({ ok: false, error: err.message });
+  }
+
+  const destPath = path.join(modsDir, filename);
+  try {
+    await new Promise((resolve, reject) => {
+      const ws = fs.createWriteStream(destPath);
+      req.pipe(ws);
+      ws.on('finish', resolve);
+      ws.on('error', reject);
+      req.on('error', reject);
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    try { fs.rmSync(destPath, { force: true }); } catch {}
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 // Initialize server manager
 manager.init();
 console.log(`Loaded ${manager.listServers().length} server(s) from registry`);
@@ -251,6 +291,43 @@ io.on('connection', (socket) => {
       if (callback) callback({ ok: true });
     } catch (err) {
       if (callback) callback({ ok: false, error: err.message });
+    }
+  });
+
+  // Mods management
+  socket.on('list-server-mods', (data, callback) => {
+    try {
+      const mods = manager.getServerMods(data.serverId);
+      callback({ ok: true, mods });
+    } catch (err) {
+      callback({ ok: false, error: err.message });
+    }
+  });
+
+  socket.on('delete-server-mod', (data, callback) => {
+    try {
+      manager.deleteServerMod(data.serverId, data.filename);
+      callback({ ok: true });
+    } catch (err) {
+      callback({ ok: false, error: err.message });
+    }
+  });
+
+  socket.on('list-template-mods', (data, callback) => {
+    try {
+      const mods = manager.getTemplateMods(data.name);
+      callback({ ok: true, mods });
+    } catch (err) {
+      callback({ ok: false, error: err.message });
+    }
+  });
+
+  socket.on('delete-template-mod', (data, callback) => {
+    try {
+      manager.deleteTemplateMod(data.name, data.filename);
+      callback({ ok: true });
+    } catch (err) {
+      callback({ ok: false, error: err.message });
     }
   });
 
