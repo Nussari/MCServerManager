@@ -1,10 +1,10 @@
-FROM eclipse-temurin:21-jre AS jre21
-FROM eclipse-temurin:25-jre AS jre25
+FROM azul/zulu-openjdk:21-jre-headless-latest AS jre21
+FROM azul/zulu-openjdk:25-jre-headless-latest AS jre25
 
 FROM node:20-slim
 
-COPY --from=jre21 /opt/java/openjdk /opt/java/21
-COPY --from=jre25 /opt/java/openjdk /opt/java/25
+COPY --from=jre21 /usr/lib/jvm/zulu21 /opt/java/21
+COPY --from=jre25 /usr/lib/jvm/zulu25 /opt/java/25
 
 ENV JAVA_HOME=/opt/java/21
 ENV PATH=$JAVA_HOME/bin:$PATH
