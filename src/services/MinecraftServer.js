@@ -18,28 +18,16 @@ const DONE_PATTERN = /Done \(\d+\.\d+s\)!/;
 const PLAYER_JOIN_PATTERN = /: (.+) joined the game/;
 const PLAYER_LEAVE_PATTERN = /: (.+) left the game/;
 
-// Aikar's G1GC tuning flags, the industry standard for Minecraft servers.
-// Tunes G1 for Minecraft's allocation patterns (high short-lived object churn).
-// https://docs.papermc.io/paper/aikars-flags
-const AIKAR_G1_FLAGS = [
-  '-XX:+UseG1GC',
-  '-XX:+ParallelRefProcEnabled',
-  '-XX:MaxGCPauseMillis=200',
-  '-XX:+UnlockExperimentalVMOptions',
-  '-XX:+DisableExplicitGC',
-  '-XX:+AlwaysPreTouch',
-  '-XX:G1NewSizePercent=30',
-  '-XX:G1MaxNewSizePercent=40',
-  '-XX:G1HeapRegionSize=8M',
-  '-XX:G1ReservePercent=20',
-  '-XX:G1HeapWastePercent=5',
-  '-XX:G1MixedGCCountTarget=4',
-  '-XX:InitiatingHeapOccupancyPercent=15',
-  '-XX:G1MixedGCLiveThresholdPercent=90',
-  '-XX:G1RSetUpdatingPauseTimePercent=5',
-  '-XX:SurvivorRatio=32',
-  '-XX:+PerfDisableSharedMem',
-  '-XX:MaxTenuringThreshold=1',
+// Minimal, clean JVM flags for Minecraft in Docker.
+// JDK 21's G1GC defaults are well-tuned out of the box.
+// No Aikar overrides — those were designed for older JDKs and can
+// conflict with modern G1 adaptive heuristics.
+const BASE_JVM_FLAGS = [
+  '-XX:+UseG1GC',              // Explicit default — best GC for MC workloads
+  '-XX:+AlwaysPreTouch',       // Pre-fault heap pages at startup, avoids latency later
+  '-XX:+PerfDisableSharedMem', // Avoid mmap'd perf counters (Docker compat)
+  '-XX:-UsePerfData',          // Fully disable perf data — prevents SIGSEGV from VM periodic task in containers
+  '-XX:-CreateCoredumpOnCrash', // Prevent multi-GB core dumps in Docker volumes
 ];
 
 class MinecraftServer extends EventEmitter {
@@ -102,7 +90,6 @@ class MinecraftServer extends EventEmitter {
 
     // Auto-detect Java version from server JAR
     let javaCmd = this.javaPath;
-    let resolvedVersion = null;
     const installed = Object.keys(config.JAVA_VERSIONS).map(Number).sort((a, b) => a - b);
     if (installed.length > 0) {
       let detectJar = null;
@@ -125,35 +112,16 @@ class MinecraftServer extends EventEmitter {
           const match = installed.find(v => v >= required);
           if (match) {
             javaCmd = config.JAVA_VERSIONS[match];
-            resolvedVersion = match;
             this._pushOutput(`[SYSTEM] Detected Java ${required} required, using Java ${match}`, 'stderr');
           }
         }
       }
     }
 
-    // GC selection: G1GC with Aikar's Minecraft-tuned flags.
-    // G1 is the JDK default and the industry standard for Minecraft servers.
-    // History: ZGC crashed (SIGSEGV), Shenandoah crashed (SymbolTable corruption
-    // on player join), Parallel GC caused multi-second STW freezes. See git log.
-    // -XX:+ParallelRefProcEnabled was removed in JDK 23+; filter it on newer JDKs.
-    const gcFlags = AIKAR_G1_FLAGS.filter(flag =>
-      flag !== '-XX:+ParallelRefProcEnabled' || !resolvedVersion || resolvedVersion <= 21
-    );
-    // Skip the C1 (quick) compiler — go straight to C2. Avoids C1 codegen bugs
-    // that cause SIGSEGV in compiled lambdas (e.g. DataFixerUpper Schema$$Lambda).
-    // Slightly slower startup, same or better steady-state performance.
-    const compilerFlags = ['-XX:-TieredCompilation'];
-    // Disable compressed oops to avoid SIGSEGV in G1's concurrent mark phase
-    // when iterating ObjArrayKlass via narrowOop (known JVM bug on large modded heaps).
-    const memFlags = ['-XX:-UseCompressedOops'];
-    const coreFlags = ['-XX:-CreateCoredumpOnCrash'];
     const extraFlags = config.DEFAULT_JVM_FLAGS ? config.DEFAULT_JVM_FLAGS.split(/\s+/).filter(Boolean) : [];
 
-    // Prepend RAM, GC, core, and extra flags for all server types.
-    // RAM flags come first so that if a custom args file also sets -Xmx,
-    // the JVM uses the last occurrence (user override wins).
-    const jvmFlags = [`-Xms${this.maxRam}`, `-Xmx${this.maxRam}`, ...gcFlags, ...compilerFlags, ...memFlags, ...coreFlags, ...extraFlags];
+    // RAM flags first so custom args files can override with last-wins semantics.
+    const jvmFlags = [`-Xms${this.maxRam}`, `-Xmx${this.maxRam}`, ...BASE_JVM_FLAGS, ...extraFlags];
     const args = [...jvmFlags, ...this.startArgs];
 
     this.process = spawn(javaCmd, args, {

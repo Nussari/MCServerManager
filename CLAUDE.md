@@ -44,7 +44,7 @@ Vanilla HTML/CSS/JS with Socket.IO client. No build step.
 
 ### Templates
 
-`templates/common/` holds shared defaults (eula.txt, server.properties, server-icon.png) copied to every new server first. Template directories overlay on top — template files override common files. Templates can be uploaded via the GUI (zip upload) or placed manually. A `template.json` stores the `startArgs` array: `["-jar", "server.jar", "nogui"]` for standard servers, or `["@user_jvm_args.txt", "@libraries/.../unix_args.txt"]` for modded. In jar mode (`-jar` first arg), the service prepends RAM flags. In custom args mode, the args files manage JVM settings.
+`templates/common/` holds shared defaults (eula.txt, server.properties, server-icon.png) copied to every new server first. Template directories overlay on top — template files override common files. Templates can be uploaded via the GUI (zip upload) or placed manually. A `template.json` stores the `startArgs` array: `["-jar", "server.jar", "nogui"]` for standard servers, or `["@user_jvm_args.txt", "@libraries/.../unix_args.txt"]` for modded. In jar mode (`-jar` first arg), the service prepends RAM flags. In custom args mode, the args files manage JVM settings. JVM flags are minimal — G1GC with Docker-safe defaults only, no Aikar overrides. Extra flags can be added via `DEFAULT_JVM_FLAGS` env var.
 
 ## Workflow Rules
 

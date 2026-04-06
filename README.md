@@ -164,6 +164,18 @@ docker run -d \
 
 The `--stop-timeout 60` gives Minecraft servers time to save worlds on shutdown.
 
+**Docker host tuning** (run on the host, not in the container):
+
+```bash
+# Increase mmap limit — Java uses many memory-mapped regions. Default (65530) is too low for large heaps.
+sudo sysctl -w vm.max_map_count=2147483642
+
+# Make it persist across reboots
+echo 'vm.max_map_count=2147483642' | sudo tee -a /etc/sysctl.conf
+```
+
+**Memory headroom**: The container needs ~25-30% more RAM than the Java heap (`-Xmx`). For an 8G heap, give the container at least 10G. The extra is used by metaspace, thread stacks, code cache, and GC overhead. If using `--memory`, set it accordingly.
+
 Place your templates in the `mc-templates` volume. You can copy files into a Docker volume with:
 
 ```bash
@@ -187,11 +199,11 @@ All settings are configurable via environment variables:
 | `CONSOLE_BUFFER_SIZE` | `500` | Lines of console output buffered per server |
 | `STOP_TIMEOUT_MS` | `30000` | Milliseconds to wait for graceful stop before force-killing |
 | `BASE_MC_PORT` | `25565` | Starting port for auto-assignment |
-| `DEFAULT_JVM_FLAGS` | — | Extra JVM flags appended after Aikar's G1GC flags for all servers (e.g. `-XX:TieredStopAtLevel=3` to disable C2 if you encounter JIT crashes). User flags are applied last, so they override Aikar defaults |
+| `DEFAULT_JVM_FLAGS` | — | Extra JVM flags appended after the base G1GC flags for all servers. Applied last, so they override defaults |
 
 ## How It Works
 
-- **Java auto-detection**: On start, the service reads the class file version from the server JAR's main class and selects the best matching JDK from the configured `JAVA_<version>` paths. G1GC with [Aikar's tuning flags](https://docs.papermc.io/paper/aikars-flags) is used for all servers — the industry standard for Minecraft. These flags tune G1 for Minecraft's allocation patterns (high short-lived object churn) to minimize GC pauses. GC flags are injected in both jar mode and custom args mode. `-XX:+ParallelRefProcEnabled` is automatically filtered out on JDK 22+ where it was removed. Core dumps are disabled to prevent multi-GB files from filling Docker volumes.
+- **Java auto-detection**: On start, the service reads the class file version from the server JAR's main class and selects the best matching JDK from the configured `JAVA_<version>` paths. G1GC is used with minimal, clean flags — JDK 21's G1 defaults are well-tuned out of the box. Performance data and core dumps are disabled for Docker compatibility. Extra JVM flags can be added via the `DEFAULT_JVM_FLAGS` env var.
 - **Process management**: Each Minecraft server runs as a child process of the Node.js service. Stdin is piped for commands, stdout/stderr are captured for the console.
 - **Communication**: Real-time events use Socket.IO (WebSocket). Template and server import ZIP uploads use HTTP POST endpoints (`/api/upload-template`, `/api/import-server`) to support large files with streaming and progress tracking.
 - **Persistence**: Server registry is stored in `data/servers.json`. On service restart, all servers start in "stopped" state — you decide what to start.
