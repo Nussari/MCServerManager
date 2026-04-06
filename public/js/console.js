@@ -33,7 +33,7 @@ socket.on('status-change', (info) => {
   infoEl.innerHTML = [
     `Port: ${esc(String(info.port))}`,
     `Template: ${esc(info.templateName)}`,
-    `RAM: ${esc(info.minRam)} / ${esc(info.maxRam)}`,
+    `RAM: ${esc(String(Math.round(parseInt(info.maxRam) / 1024)))} GB`,
     info.status === 'running' ? `Players: ${esc(String(info.playerCount))}` : null,
     info.startedAt ? `Started: ${esc(new Date(info.startedAt).toLocaleTimeString())}` : null,
   ].filter(Boolean).map(t => `<span>${t}</span>`).join('');
@@ -176,7 +176,7 @@ function populateEditForm(s) {
   const ramMatch = s.maxRam.match(/^(\d+)M$/);
   const ramGB = ramMatch ? Math.round(parseInt(ramMatch[1]) / 1024) : 1;
   const ramSelect = document.getElementById('edit-maxram');
-  const clampedRam = Math.max(1, Math.min(8, ramGB));
+  const clampedRam = Math.max(1, Math.min(10, ramGB));
   ramSelect.value = String(clampedRam);
 }
 

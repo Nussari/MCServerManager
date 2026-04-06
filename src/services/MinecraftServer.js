@@ -144,13 +144,16 @@ class MinecraftServer extends EventEmitter {
     // that cause SIGSEGV in compiled lambdas (e.g. DataFixerUpper Schema$$Lambda).
     // Slightly slower startup, same or better steady-state performance.
     const compilerFlags = ['-XX:-TieredCompilation'];
+    // Disable compressed oops to avoid SIGSEGV in G1's concurrent mark phase
+    // when iterating ObjArrayKlass via narrowOop (known JVM bug on large modded heaps).
+    const memFlags = ['-XX:-UseCompressedOops'];
     const coreFlags = ['-XX:-CreateCoredumpOnCrash'];
     const extraFlags = config.DEFAULT_JVM_FLAGS ? config.DEFAULT_JVM_FLAGS.split(/\s+/).filter(Boolean) : [];
 
     // Prepend RAM, GC, core, and extra flags for all server types.
     // RAM flags come first so that if a custom args file also sets -Xmx,
     // the JVM uses the last occurrence (user override wins).
-    const jvmFlags = [`-Xms${this.maxRam}`, `-Xmx${this.maxRam}`, ...gcFlags, ...compilerFlags, ...coreFlags, ...extraFlags];
+    const jvmFlags = [`-Xms${this.maxRam}`, `-Xmx${this.maxRam}`, ...gcFlags, ...compilerFlags, ...memFlags, ...coreFlags, ...extraFlags];
     const args = [...jvmFlags, ...this.startArgs];
 
     this.process = spawn(javaCmd, args, {

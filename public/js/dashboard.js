@@ -107,7 +107,6 @@ form.onsubmit = async (e) => {
     gamemode: document.getElementById('srv-gamemode').value,
     hardcore: document.getElementById('srv-hardcore').checked,
     maxRam: `${parseInt(ramValue) * 1024}M`,
-    minRam: '1024M',
     pvp: document.getElementById('srv-pvp').checked,
     maxPlayers: document.getElementById('srv-maxplayers').value || undefined,
     viewDistance: document.getElementById('srv-viewdist').value || undefined,
@@ -534,7 +533,6 @@ document.getElementById('confirm-import').onclick = () => {
     importId: pendingImportId,
     name,
     port: document.getElementById('imp-port').value || undefined,
-    minRam: '1024M',
     maxRam: `${parseInt(ramValue) * 1024}M`,
   };
   if (customArgs) {
