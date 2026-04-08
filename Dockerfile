@@ -46,7 +46,7 @@ VOLUME ["/app/data", "/app/servers", "/app/templates"]
 
 EXPOSE 3000
 
-RUN groupadd -r mcmanager && useradd -r -g mcmanager mcmanager && \
+RUN groupadd -r mcmanager && useradd -r -m -g mcmanager mcmanager && \
     chown -R mcmanager:mcmanager /app
 USER mcmanager
 
