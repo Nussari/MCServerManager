@@ -80,6 +80,11 @@ body {
   font-weight: 600;
 }
 
+.navbar-logo {
+  height: 36px;
+  image-rendering: pixelated;
+}
+
 .navbar a {
   color: var(--text-muted);
   text-decoration: none;
