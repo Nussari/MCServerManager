@@ -81,6 +81,7 @@ body {
 }
 
 .navbar-logo {
+  margin-left: 0.1em;
   height: 36px;
   image-rendering: pixelated;
 }

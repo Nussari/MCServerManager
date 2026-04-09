@@ -1,6 +1,6 @@
 {
   "name": "minecraft-server-manager",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "private": true,
   "description": "Web dashboard for managing multiple Minecraft servers",
   "main": "src/index.js",
