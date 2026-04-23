@@ -40,9 +40,9 @@ COPY templates/common/ defaults/common/
 COPY entrypoint.sh entrypoint.sh
 
 RUN chmod +x entrypoint.sh && \
-    mkdir -p /app/data /app/servers /app/templates
+    mkdir -p /app/data /app/servers /app/templates /app/backups
 
-VOLUME ["/app/data", "/app/servers", "/app/templates"]
+VOLUME ["/app/data", "/app/servers", "/app/templates", "/app/backups"]
 
 EXPOSE 3000
 

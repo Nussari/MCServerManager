@@ -611,6 +611,14 @@ class ServerManager extends EventEmitter {
     return fs.existsSync(this._backupPath(id));
   }
 
+  getBackupInfo(id) {
+    this.getServer(id);
+    const p = this._backupPath(id);
+    if (!fs.existsSync(p)) return null;
+    const stat = fs.statSync(p);
+    return { size: stat.size, createdAt: stat.mtime.toISOString() };
+  }
+
   async backupServer(id) {
     const server = this.getServer(id);
 

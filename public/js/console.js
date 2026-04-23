@@ -14,6 +14,7 @@ const btnStop = document.getElementById('btn-stop');
 const btnEdit = document.getElementById('btn-edit');
 const btnBackup = document.getElementById('btn-backup');
 const btnRestore = document.getElementById('btn-restore');
+const backupInfoEl = document.getElementById('backup-info');
 const consoleOutput = document.getElementById('console-output');
 const commandInput = document.getElementById('command-input');
 const sendBtn = document.getElementById('send-btn');
@@ -120,11 +121,22 @@ btnStop.onclick = () => {
 
 let hasBackup = false;
 
+function formatBackupSize(bytes) {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 function refreshBackupState() {
   socket.emit('has-backup', { serverId }, (res) => {
-    if (res && res.ok) {
-      hasBackup = res.exists;
-      btnRestore.disabled = !hasBackup;
+    if (!res || !res.ok) return;
+    hasBackup = res.exists;
+    btnRestore.disabled = !hasBackup;
+    if (hasBackup) {
+      const when = new Date(res.createdAt).toLocaleString();
+      backupInfoEl.textContent = `Backup: ${formatBackupSize(res.size)} · ${when}`;
+    } else {
+      backupInfoEl.textContent = 'No backup';
     }
   });
 }
@@ -142,8 +154,8 @@ btnBackup.onclick = () => {
     if (r.ok) {
       hasBackup = true;
       btnRestore.disabled = false;
-      const mb = (r.size / (1024 * 1024)).toFixed(1);
-      alert(`Backup complete (${mb} MB).`);
+      refreshBackupState();
+      alert(`Backup complete (${formatBackupSize(r.size)}).`);
     } else {
       alert('Backup failed: ' + r.error);
     }

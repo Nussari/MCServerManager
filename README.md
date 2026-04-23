@@ -171,6 +171,7 @@ docker run -d \
   -v mc-data:/app/data \
   -v mc-servers:/app/servers \
   -v mc-templates:/app/templates \
+  -v mc-backups:/app/backups \
   --stop-timeout 60 \
   mc-manager
 ```

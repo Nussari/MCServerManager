@@ -334,7 +334,8 @@ io.on('connection', (socket) => {
   // Backup
   socket.on('has-backup', (data, callback) => {
     try {
-      callback({ ok: true, exists: manager.hasBackup(data.serverId) });
+      const info = manager.getBackupInfo(data.serverId);
+      callback({ ok: true, exists: !!info, ...(info || {}) });
     } catch (err) {
       callback({ ok: false, error: err.message });
     }
