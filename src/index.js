@@ -331,6 +331,33 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Backup
+  socket.on('has-backup', (data, callback) => {
+    try {
+      callback({ ok: true, exists: manager.hasBackup(data.serverId) });
+    } catch (err) {
+      callback({ ok: false, error: err.message });
+    }
+  });
+
+  socket.on('backup-server', async (data, callback) => {
+    try {
+      const info = await manager.backupServer(data.serverId);
+      callback({ ok: true, ...info });
+    } catch (err) {
+      callback({ ok: false, error: err.message });
+    }
+  });
+
+  socket.on('restore-backup', async (data, callback) => {
+    try {
+      await manager.restoreBackup(data.serverId);
+      callback({ ok: true });
+    } catch (err) {
+      callback({ ok: false, error: err.message });
+    }
+  });
+
   // Server console room
   socket.on('join-server', (data) => {
     if (!data || !data.serverId) return;

@@ -1,6 +1,7 @@
 node_modules/
 data/
 servers/
+backups/
 templates/*
 !templates/common/
 *.log

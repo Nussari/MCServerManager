@@ -12,6 +12,8 @@ const infoEl = document.getElementById('server-info');
 const btnStart = document.getElementById('btn-start');
 const btnStop = document.getElementById('btn-stop');
 const btnEdit = document.getElementById('btn-edit');
+const btnBackup = document.getElementById('btn-backup');
+const btnRestore = document.getElementById('btn-restore');
 const consoleOutput = document.getElementById('console-output');
 const commandInput = document.getElementById('command-input');
 const sendBtn = document.getElementById('send-btn');
@@ -113,6 +115,57 @@ btnStop.onclick = () => {
   socket.emit('stop-server', { serverId }, (res) => {
     btnStop.disabled = false;
     if (!res.ok) alert('Failed to stop: ' + res.error);
+  });
+};
+
+let hasBackup = false;
+
+function refreshBackupState() {
+  socket.emit('has-backup', { serverId }, (res) => {
+    if (res && res.ok) {
+      hasBackup = res.exists;
+      btnRestore.disabled = !hasBackup;
+    }
+  });
+}
+
+refreshBackupState();
+
+btnBackup.onclick = () => {
+  if (hasBackup && !confirm('An existing backup will be overwritten. Continue?')) return;
+  btnBackup.disabled = true;
+  const originalText = btnBackup.textContent;
+  btnBackup.textContent = 'Backing up...';
+  socket.emit('backup-server', { serverId }, (r) => {
+    btnBackup.disabled = false;
+    btnBackup.textContent = originalText;
+    if (r.ok) {
+      hasBackup = true;
+      btnRestore.disabled = false;
+      const mb = (r.size / (1024 * 1024)).toFixed(1);
+      alert(`Backup complete (${mb} MB).`);
+    } else {
+      alert('Backup failed: ' + r.error);
+    }
+  });
+};
+
+btnRestore.onclick = () => {
+  if (btnRestore.disabled) return;
+  if (!confirm('Restore will overwrite the current world with the backup. Continue?')) return;
+  btnRestore.disabled = true;
+  btnBackup.disabled = true;
+  const originalText = btnRestore.textContent;
+  btnRestore.textContent = 'Restoring...';
+  socket.emit('restore-backup', { serverId }, (r) => {
+    btnRestore.textContent = originalText;
+    btnRestore.disabled = !hasBackup;
+    btnBackup.disabled = false;
+    if (r.ok) {
+      alert('Restore complete.');
+    } else {
+      alert('Restore failed: ' + r.error);
+    }
   });
 };
 

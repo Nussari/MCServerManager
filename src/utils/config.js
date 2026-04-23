@@ -15,6 +15,7 @@ const config = {
   SERVERS_DIR: process.env.SERVERS_DIR || path.join(ROOT_DIR, 'servers'),
   TEMPLATES_DIR: process.env.TEMPLATES_DIR || path.join(ROOT_DIR, 'templates'),
   DATA_DIR: process.env.DATA_DIR || path.join(ROOT_DIR, 'data'),
+  BACKUPS_DIR: process.env.BACKUPS_DIR || path.join(ROOT_DIR, 'backups'),
   DEFAULT_JAVA: process.env.DEFAULT_JAVA || 'java',
   DEFAULT_MIN_RAM: process.env.DEFAULT_MIN_RAM || '1024M',
   DEFAULT_MAX_RAM: process.env.DEFAULT_MAX_RAM || '6G',
@@ -29,5 +30,6 @@ const config = {
 fs.mkdirSync(config.SERVERS_DIR, { recursive: true });
 fs.mkdirSync(config.TEMPLATES_DIR, { recursive: true });
 fs.mkdirSync(config.DATA_DIR, { recursive: true });
+fs.mkdirSync(config.BACKUPS_DIR, { recursive: true });
 
 module.exports = config;

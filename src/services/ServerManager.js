@@ -600,6 +600,96 @@ class ServerManager extends EventEmitter {
     return modsDir;
   }
 
+  // --- Backup ---
+
+  _backupPath(id) {
+    return path.join(config.BACKUPS_DIR, `${id}.zip`);
+  }
+
+  hasBackup(id) {
+    this.getServer(id); // validates id
+    return fs.existsSync(this._backupPath(id));
+  }
+
+  async backupServer(id) {
+    const server = this.getServer(id);
+
+    if (server.status === STATUS.RUNNING || server.status === STATUS.STARTING || server.status === STATUS.STOPPING) {
+      throw new Error('Stop the server before creating a backup');
+    }
+
+    // Determine world folder name from server.properties (default "world")
+    let levelName = 'world';
+    const propsPath = path.join(server.directory, 'server.properties');
+    if (fs.existsSync(propsPath)) {
+      const { entries } = properties.parse(propsPath);
+      if (entries['level-name']) levelName = entries['level-name'];
+    }
+
+    // Include the main world plus nether/end dirs (world, world_nether, world_the_end)
+    const worldDirs = [];
+    for (const entry of fs.readdirSync(server.directory, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      if (entry.name === levelName || entry.name.startsWith(`${levelName}_`)) {
+        worldDirs.push(entry.name);
+      }
+    }
+
+    if (worldDirs.length === 0) {
+      throw new Error(`No world directory found (looked for "${levelName}")`);
+    }
+
+    const zip = new AdmZip();
+    for (const dir of worldDirs) {
+      zip.addLocalFolder(path.join(server.directory, dir), dir);
+    }
+
+    const backupPath = this._backupPath(id);
+    const tempPath = `${backupPath}.tmp`;
+    await zip.writeZipPromise(tempPath);
+    fs.renameSync(tempPath, backupPath);
+
+    const stat = fs.statSync(backupPath);
+    return { size: stat.size, createdAt: stat.mtime.toISOString() };
+  }
+
+  async restoreBackup(id) {
+    const server = this.getServer(id);
+
+    if (server.status === STATUS.RUNNING || server.status === STATUS.STARTING || server.status === STATUS.STOPPING) {
+      throw new Error('Stop the server before restoring a backup');
+    }
+
+    const backupPath = this._backupPath(id);
+    if (!fs.existsSync(backupPath)) {
+      throw new Error('No backup exists for this server');
+    }
+
+    const zip = new AdmZip(backupPath);
+    const entries = zip.getEntries();
+
+    // Collect top-level dir names from the zip (world, world_nether, ...)
+    const topDirs = new Set();
+    for (const entry of entries) {
+      const parts = entry.entryName.split('/');
+      if (parts.length > 0 && parts[0]) topDirs.add(parts[0]);
+    }
+
+    if (topDirs.size === 0) {
+      throw new Error('Backup archive is empty');
+    }
+
+    // Remove only the world dirs present in the backup
+    for (const dir of topDirs) {
+      if (dir.includes('..') || path.isAbsolute(dir)) {
+        throw new Error('Backup contains an invalid path');
+      }
+      fs.rmSync(path.join(server.directory, dir), { recursive: true, force: true });
+    }
+
+    await zip.extractAllToAsync(server.directory, true);
+  }
+
   // --- Existing methods ---
 
   async deleteServer(id) {
@@ -611,6 +701,7 @@ class ServerManager extends EventEmitter {
 
     this.servers.delete(id);
     fs.rmSync(server.directory, { recursive: true, force: true });
+    fs.rmSync(this._backupPath(id), { force: true });
     this._persist();
   }
 

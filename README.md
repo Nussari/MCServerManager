@@ -26,6 +26,7 @@ serverService/
 │       └── console.js
 ├── data/                         # Runtime: server registry (servers.json)
 ├── servers/                      # Runtime: MC server instance directories
+├── backups/                      # Runtime: world backups (one zip per server)
 ├── templates/                    # Server templates + common defaults
 │   └── common/                   # Shared defaults (eula, properties, icon)
 ├── Dockerfile
@@ -144,6 +145,18 @@ When creating or editing a server, you can configure:
 
 Settings can be changed after creation via the Edit button on the server detail page. Property changes require a server restart to take effect.
 
+## World Backups
+
+Click the **Backup** button on a server's detail page to create a ZIP of the world data. Only world folders are included (the `level-name` dir plus any `{level-name}_nether` / `{level-name}_the_end` dims) — not mods, configs, or server jars.
+
+Click **Restore** to replace the current world with the stored backup. The button is disabled when no backup exists.
+
+**Rules:**
+- The server must be stopped before backing up or restoring (ensures a consistent save).
+- Each server has at most one backup. Running a new backup overwrites the previous one — the UI asks for confirmation first.
+- Restore only replaces the folders present in the backup ZIP; unrelated server files are left untouched.
+- Backups are stored in `backups/{serverId}.zip` and are deleted when the server is deleted.
+
 ## Docker
 
 ```bash
@@ -192,6 +205,7 @@ All settings are configurable via environment variables:
 | `SERVERS_DIR` | `./servers` | Where server instances are stored |
 | `TEMPLATES_DIR` | `./templates` | Where templates live |
 | `DATA_DIR` | `./data` | Where servers.json is stored |
+| `BACKUPS_DIR` | `./backups` | Where world backups are stored |
 | `DEFAULT_JAVA` | `java` | Path to Java binary (fallback when auto-detect is unavailable) |
 | `JAVA_<version>` | — | Path to a specific Java version (e.g. `JAVA_21=/opt/java/21/bin/java`). Used by auto-detection to pick the right JDK for each server JAR |
 | `DEFAULT_MIN_RAM` | `1024M` | Default min RAM for new servers (note: `-Xms` is set equal to `-Xmx` at launch to avoid heap resize pauses) |
@@ -234,6 +248,9 @@ All settings are configurable via environment variables:
 | `delete-template` | `{ name }` | Delete a template directory (callback) |
 | `finalize-import` | `{ importId, name, serverJar?, customArgs?, port?, minRam?, maxRam? }` | Confirm server import with chosen jar/args |
 | `cancel-import` | `{ importId }` | Cancel pending server import |
+| `has-backup` | `{ serverId }` | Check if a world backup exists (callback: `{ ok, exists }`) |
+| `backup-server` | `{ serverId }` | Create/overwrite the world backup; server must be stopped (callback: `{ ok, size, createdAt }`) |
+| `restore-backup` | `{ serverId }` | Replace the world folders with the stored backup; server must be stopped (callback: `{ ok }`) |
 
 ### HTTP Endpoints
 

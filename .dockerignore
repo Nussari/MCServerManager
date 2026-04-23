@@ -3,6 +3,7 @@ node_modules
 .claude
 servers
 data
+backups
 templates/*
 !templates/common/
 *.jar
