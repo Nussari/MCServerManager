@@ -60,3 +60,4 @@ Vanilla HTML/CSS/JS with Socket.IO client. No build step.
 - Validate RAM values match `/^\d+[MG]$/` before passing to spawn arguments.
 - Validate path inputs (serverJar, template names) to prevent path traversal.
 - Developed on Windows, deployed in Linux containers. Use `path.join()` everywhere, never hardcode separators.
+- For modal/overlay backdrop dismissal, listen for the `backdrop-dismiss` custom event (`overlay.addEventListener('backdrop-dismiss', closeFn)`). The delegation is installed once in `public/js/utils.js` for every `.modal-overlay`. Never use `overlay.onclick` or a `'click'` listener that checks `e.target === overlay` — `click` fires on the common ancestor of mousedown/mouseup, so a drag-select that ends on the backdrop would falsely dismiss the modal.

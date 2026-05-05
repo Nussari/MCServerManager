@@ -80,7 +80,7 @@ function loadTemplates() {
 document.getElementById('add-server-btn').onclick = openModal;
 document.getElementById('add-server-btn-empty').onclick = openModal;
 document.getElementById('cancel-modal').onclick = closeModal;
-modalOverlay.onclick = (e) => { if (e.target === modalOverlay) closeModal(); };
+modalOverlay.addEventListener('backdrop-dismiss', closeModal);
 
 function openModal() {
   formError.textContent = '';
@@ -206,14 +206,12 @@ document.getElementById('cancel-template-pick').onclick = () => {
   }
   closeTemplateModal();
 };
-templateModalOverlay.onclick = (e) => {
-  if (e.target === templateModalOverlay) {
-    if (pendingTemplateName) {
-      socket.emit('cancel-template-upload', { name: pendingTemplateName });
-    }
-    closeTemplateModal();
+templateModalOverlay.addEventListener('backdrop-dismiss', () => {
+  if (pendingTemplateName) {
+    socket.emit('cancel-template-upload', { name: pendingTemplateName });
   }
-};
+  closeTemplateModal();
+});
 
 function openTemplateModal() {
   templateError.textContent = '';
@@ -339,14 +337,12 @@ document.getElementById('cancel-import-configure').onclick = () => {
   }
   closeImportModal();
 };
-importModalOverlay.onclick = (e) => {
-  if (e.target === importModalOverlay) {
-    if (pendingImportId) {
-      socket.emit('cancel-import', { importId: pendingImportId });
-    }
-    closeImportModal();
+importModalOverlay.addEventListener('backdrop-dismiss', () => {
+  if (pendingImportId) {
+    socket.emit('cancel-import', { importId: pendingImportId });
   }
-};
+  closeImportModal();
+});
 
 function openImportModal() {
   importError.textContent = '';
@@ -451,7 +447,7 @@ const viewTemplatesError = document.getElementById('view-templates-error');
 
 document.getElementById('view-templates-btn').onclick = openViewTemplatesModal;
 document.getElementById('close-view-templates-modal').onclick = closeViewTemplatesModal;
-viewTemplatesModalOverlay.onclick = (e) => { if (e.target === viewTemplatesModalOverlay) closeViewTemplatesModal(); };
+viewTemplatesModalOverlay.addEventListener('backdrop-dismiss', closeViewTemplatesModal);
 
 function openViewTemplatesModal() {
   viewTemplatesError.textContent = '';
@@ -528,7 +524,7 @@ const tplModFilesInput = document.getElementById('tpl-mod-files');
 let currentModsTemplateName = null;
 
 document.getElementById('close-template-mods-modal').onclick = closeTemplateModsModal;
-tplModsModalOverlay.onclick = (e) => { if (e.target === tplModsModalOverlay) closeTemplateModsModal(); };
+tplModsModalOverlay.addEventListener('backdrop-dismiss', closeTemplateModsModal);
 
 function openTemplateModsModal(name) {
   currentModsTemplateName = name;

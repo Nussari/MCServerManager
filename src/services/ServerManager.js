@@ -600,6 +600,120 @@ class ServerManager extends EventEmitter {
     return modsDir;
   }
 
+  // --- Server file update (manual, per-server) ---
+
+  // Resolve a user-supplied relative path inside a server directory, rejecting
+  // anything that would escape (..), use absolute paths, drive letters, or
+  // leading separators ("folder/" must not become "/folder/").
+  _resolveSafePath(serverDir, relpath) {
+    if (typeof relpath !== 'string' || relpath.length === 0) {
+      throw new Error('Invalid path');
+    }
+    // Normalize separators and reject leading separator / drive letter
+    const norm = relpath.replace(/\\/g, '/');
+    if (norm.startsWith('/') || /^[a-zA-Z]:/.test(norm)) {
+      throw new Error(`Invalid path "${relpath}" (must be relative)`);
+    }
+    // Reject any traversal segment
+    if (norm.split('/').some(seg => seg === '..' || seg === '')) {
+      throw new Error(`Invalid path "${relpath}"`);
+    }
+    const resolved = path.resolve(serverDir, norm);
+    const rel = path.relative(serverDir, resolved);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+      throw new Error(`Path escapes server directory: "${relpath}"`);
+    }
+    return resolved;
+  }
+
+  _assertServerStopped(server) {
+    if (server.status !== STATUS.STOPPED && server.status !== STATUS.CRASHED) {
+      throw new Error('Stop the server before updating files');
+    }
+  }
+
+  // Move a single uploaded file into the server directory at relpath, overwriting on conflict.
+  // sourceFilePath is a temp file already on disk (streamed by the HTTP handler).
+  updateServerFile(id, relpath, sourceFilePath) {
+    const server = this.getServer(id);
+    this._assertServerStopped(server);
+
+    const destPath = this._resolveSafePath(server.directory, relpath);
+    const existed = fs.existsSync(destPath);
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+
+    try {
+      // rename is atomic on the same filesystem; fall back to copy for cross-device temp dirs
+      fs.renameSync(sourceFilePath, destPath);
+    } catch {
+      fs.copyFileSync(sourceFilePath, destPath);
+      try { fs.rmSync(sourceFilePath, { force: true }); } catch {}
+    }
+
+    return { overwritten: existed };
+  }
+
+  // Extract a ZIP archive into the server directory, overwriting on conflict.
+  // Validates every entry path before writing.
+  updateServerZip(id, zipFilePath) {
+    const server = this.getServer(id);
+    this._assertServerStopped(server);
+
+    const zip = new AdmZip(zipFilePath);
+    const entries = zip.getEntries();
+
+    let added = 0;
+    let overwritten = 0;
+
+    // Validate all entry paths up front so a bad entry rejects the whole archive
+    for (const entry of entries) {
+      if (entry.isDirectory) continue;
+      this._resolveSafePath(server.directory, entry.entryName);
+    }
+
+    for (const entry of entries) {
+      if (entry.isDirectory) continue;
+      const destPath = this._resolveSafePath(server.directory, entry.entryName);
+      const existed = fs.existsSync(destPath);
+      fs.mkdirSync(path.dirname(destPath), { recursive: true });
+      fs.writeFileSync(destPath, entry.getData());
+      if (existed) overwritten++; else added++;
+    }
+
+    return { added, overwritten };
+  }
+
+  // Replace a server's startArgs (does NOT touch the originating template).
+  setServerStartArgs(id, startArgs) {
+    const server = this.getServer(id);
+    this._assertServerStopped(server);
+
+    if (!Array.isArray(startArgs) || startArgs.length === 0) {
+      throw new Error('startArgs must be a non-empty array');
+    }
+    for (const arg of startArgs) {
+      if (typeof arg !== 'string' || arg.length === 0) {
+        throw new Error('Each start argument must be a non-empty string');
+      }
+    }
+
+    // Jar mode: validate the referenced jar exists in the server directory
+    if (startArgs[0] === '-jar') {
+      if (startArgs.length < 2) throw new Error('Missing jar path after -jar');
+      const jarRel = startArgs[1];
+      if (jarRel.includes('..') || path.isAbsolute(jarRel)) {
+        throw new Error('Invalid jar path in start arguments');
+      }
+      if (!fs.existsSync(path.join(server.directory, jarRel))) {
+        throw new Error(`Jar file not found in server directory: ${jarRel}`);
+      }
+    }
+
+    server.startArgs = startArgs;
+    this._persist();
+    return server.getInfo();
+  }
+
   // --- Backup ---
 
   _backupPath(id) {

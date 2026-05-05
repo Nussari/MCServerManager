@@ -23,7 +23,13 @@
       <button class="btn btn-primary" id="btn-start" style="display:none">Start</button>
       <button class="btn btn-danger" id="btn-stop" style="display:none">Stop</button>
       <button class="btn btn-secondary" id="btn-edit">Edit</button>
-      <button class="btn btn-secondary" id="btn-mods">Mods</button>
+      <div class="files-menu-wrap">
+        <button class="btn btn-secondary" id="btn-files">Files <span class="caret">&#9662;</span></button>
+        <div class="files-menu" id="files-menu">
+          <button type="button" class="files-menu-item" id="files-menu-mods">Mods</button>
+          <button type="button" class="files-menu-item" id="files-menu-update">Update</button>
+        </div>
+      </div>
       <button class="btn btn-secondary" id="btn-backup">Backup</button>
       <button class="btn btn-secondary" id="btn-restore" disabled>Restore</button>
       <span id="backup-info" style="font-size:0.8rem;color:var(--text-muted);align-self:center"></span>
@@ -164,6 +170,62 @@
       </div>
     </div>
   </div>
+
+  <!-- Update Server Modal -->
+  <div class="modal-overlay" id="update-modal-overlay">
+    <div class="modal modal-wide">
+      <h2>Update Server Files</h2>
+      <div class="notice">Server must be stopped. Existing files will be overwritten.</div>
+      <div class="form-error" id="update-stopped-warn" style="display:none">Stop the server before updating files.</div>
+
+      <div class="drop-zone" id="update-drop-zone">
+        <p><strong>Drag files or folders here</strong></p>
+        <p style="font-size:0.8rem;color:var(--text-muted);margin:4px 0 10px">A single ZIP will be extracted server-side. Folders preserve their structure.</p>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+          <button type="button" class="btn btn-secondary btn-sm" id="update-pick-files">Choose files</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="update-pick-folder">Choose folder</button>
+        </div>
+        <input type="file" id="update-files-input" multiple style="display:none">
+        <input type="file" id="update-folder-input" multiple webkitdirectory style="display:none">
+      </div>
+
+      <div id="update-staged-list" class="staged-list"></div>
+
+      <details class="advanced-section" id="update-args-details">
+        <summary>Edit start arguments (optional)</summary>
+        <div class="form-group">
+          <label for="update-args-text">Start arguments (one per line)</label>
+          <textarea id="update-args-text" rows="4" spellcheck="false"></textarea>
+          <p style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">
+            Examples: <code>-jar</code> / <code>server.jar</code> / <code>nogui</code> &nbsp;·&nbsp;
+            <code>@user_jvm_args.txt</code> / <code>@libraries/.../unix_args.txt</code>
+          </p>
+        </div>
+      </details>
+
+      <div class="toggle-group" id="update-backup-row">
+        <label>Back up world before update</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="update-backup-checkbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="upload-progress" id="update-progress" style="display:none">
+        <div class="upload-progress-text" id="update-progress-text">Preparing...</div>
+        <div class="download-progress-bar-bg"><div class="download-progress-bar" id="update-progress-bar"></div></div>
+      </div>
+
+      <div class="form-error" id="update-error"></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="cancel-update">Cancel</button>
+        <button type="button" class="btn btn-primary" id="apply-update" disabled>Apply Update</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toast-container"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/utils.js"></script>

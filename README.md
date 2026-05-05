@@ -145,6 +145,29 @@ When creating or editing a server, you can configure:
 
 Settings can be changed after creation via the Edit button on the server detail page. Property changes require a server restart to take effect.
 
+## Updating Server Files
+
+The server detail page has a **Files** menu (top-right of the action bar) with two options:
+
+- **Mods** — manage the server's `mods/` directory (jars only).
+- **Update** — drop new files or folders into the server directory, replacing whatever is already there.
+
+The Update modal accepts:
+
+- **Individual files or folders** dragged onto the drop zone (or picked via the buttons). Folder structure is preserved — drop `mods/` and `config/` and they land at the right places. Each file is uploaded individually with a progress bar.
+- **A single ZIP archive** — auto-detected when exactly one `.zip` is staged. The whole archive uploads in one request and is extracted server-side. This is much faster than per-file uploads for modded servers (e.g. NeoForge `libraries/` trees with thousands of small files).
+
+**Optional extras in the same modal:**
+
+- **Edit start arguments** — collapsible section pre-filled with the server's current `startArgs` (one per line). Useful when bumping a NeoForge version that ships a new `unix_args.txt` path. Only the per-server config is changed; the originating template is left alone.
+- **Back up world before update** — runs the world backup pipeline (see below) before any files are touched.
+
+**Rules:**
+
+- The server must be stopped. Updates are blocked while the server is running, starting, or stopping.
+- Conflicts always overwrite — the new file wins. Old files that aren't in your upload are left in place; if you need to remove them use the Mods modal or delete them out-of-band.
+- Paths are validated server-side: leading separators, drive letters, and `..` segments are rejected, and every resolved path must stay inside the server directory.
+
 ## World Backups
 
 Click the **Backup** button on a server's detail page to create a ZIP of the world data. Only world folders are included (the `level-name` dir plus any `{level-name}_nether` / `{level-name}_the_end` dims) — not mods, configs, or server jars.
@@ -220,7 +243,7 @@ All settings are configurable via environment variables:
 
 - **Java auto-detection**: On start, the service reads the class file version from the server JAR's main class and selects the best matching JDK from the configured `JAVA_<version>` paths. G1GC is used with minimal, clean flags — JDK 21's G1 defaults are well-tuned out of the box. Performance data and core dumps are disabled for Docker compatibility. Extra JVM flags can be added via the `DEFAULT_JVM_FLAGS` env var.
 - **Process management**: Each Minecraft server runs as a child process of the Node.js service. Stdin is piped for commands, stdout/stderr are captured for the console.
-- **Communication**: Real-time events use Socket.IO (WebSocket). Template and server import ZIP uploads use HTTP POST endpoints (`/api/upload-template`, `/api/import-server`) to support large files with streaming and progress tracking.
+- **Communication**: Real-time events use Socket.IO (WebSocket). File uploads (template ZIPs, server import ZIPs, mod jars, server updates) use HTTP POST endpoints (`/api/upload-template`, `/api/import-server`, `/api/upload-mods`, `/api/update-server-file`, `/api/update-server-zip`) to support large files with streaming and progress tracking.
 - **Persistence**: Server registry is stored in `data/servers.json`. On service restart, all servers start in "stopped" state — you decide what to start.
 - **Graceful shutdown**: On SIGTERM/SIGINT, the service sends `stop` to all running Minecraft servers and waits for them to save before exiting.
 
@@ -249,6 +272,8 @@ All settings are configurable via environment variables:
 | `delete-template` | `{ name }` | Delete a template directory (callback) |
 | `finalize-import` | `{ importId, name, serverJar?, customArgs?, port?, minRam?, maxRam? }` | Confirm server import with chosen jar/args |
 | `cancel-import` | `{ importId }` | Cancel pending server import |
+| `get-server-startargs` | `{ serverId }` | Get the server's current `startArgs` array (callback: `{ ok, startArgs }`) |
+| `set-server-startargs` | `{ serverId, startArgs: string[] }` | Replace the server's `startArgs`; server must be stopped, jar mode validates the jar exists (callback: `{ ok, server }`) |
 | `has-backup` | `{ serverId }` | Check if a world backup exists (callback: `{ ok, exists }`) |
 | `backup-server` | `{ serverId }` | Create/overwrite the world backup; server must be stopped (callback: `{ ok, size, createdAt }`) |
 | `restore-backup` | `{ serverId }` | Replace the world folders with the stored backup; server must be stopped (callback: `{ ok }`) |
@@ -259,6 +284,8 @@ All settings are configurable via environment variables:
 |--------|------|------|-------------|
 | `POST` | `/api/upload-template?name=<name>` | Raw ZIP binary | Upload template ZIP (streams to disk). Returns `{ ok, files }`. |
 | `POST` | `/api/import-server?name=<name>` | Raw ZIP binary | Upload server ZIP for import (streams to disk). Returns `{ ok, importId, jarFiles, detectedSettings, hasEula, moddedHint }`. |
+| `POST` | `/api/update-server-file?id=<serverId>&relpath=<path>` | Raw file binary | Stream a single file into the server directory at `relpath`, overwriting on conflict. Server must be stopped. Returns `{ ok, overwritten }`. |
+| `POST` | `/api/update-server-zip?id=<serverId>` | Raw ZIP binary | Stream a ZIP, extract into the server directory, overwriting on conflict. Server must be stopped. Returns `{ ok, added, overwritten }`. |
 
 ### Server → Client
 

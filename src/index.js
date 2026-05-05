@@ -113,6 +113,58 @@ app.post('/api/upload-mods', async (req, res) => {
   }
 });
 
+// HTTP server-update file upload — streams a single file into the server dir at a relative path.
+// Server must be stopped. Path is validated by ServerManager._resolveSafePath.
+app.post('/api/update-server-file', async (req, res) => {
+  const { id, relpath } = req.query;
+  if (!id || !relpath) {
+    return res.json({ ok: false, error: 'Missing id or relpath' });
+  }
+
+  // Stage to a temp file first, then move into place via ServerManager so validation runs before
+  // overwriting anything in the server directory.
+  const tempPath = path.join(config.DATA_DIR, `_upload_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+  try {
+    await new Promise((resolve, reject) => {
+      const ws = fs.createWriteStream(tempPath);
+      req.pipe(ws);
+      ws.on('finish', resolve);
+      ws.on('error', reject);
+      req.on('error', reject);
+    });
+    const result = manager.updateServerFile(id, relpath, tempPath);
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    try { fs.rmSync(tempPath, { force: true }); } catch {}
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+// HTTP server-update ZIP upload — streams a ZIP, extracts into the server dir, overwriting on conflict.
+app.post('/api/update-server-zip', async (req, res) => {
+  const { id } = req.query;
+  if (!id) {
+    return res.json({ ok: false, error: 'Missing id' });
+  }
+
+  const tempZip = path.join(config.DATA_DIR, `_upload_${Date.now()}_update.zip`);
+  try {
+    await new Promise((resolve, reject) => {
+      const ws = fs.createWriteStream(tempZip);
+      req.pipe(ws);
+      ws.on('finish', resolve);
+      ws.on('error', reject);
+      req.on('error', reject);
+    });
+    const result = manager.updateServerZip(id, tempZip);
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  } finally {
+    try { fs.rmSync(tempZip, { force: true }); } catch {}
+  }
+});
+
 // Initialize server manager
 manager.init();
 console.log(`Loaded ${manager.listServers().length} server(s) from registry`);
@@ -326,6 +378,27 @@ io.on('connection', (socket) => {
     try {
       manager.deleteTemplateMod(data.name, data.filename);
       callback({ ok: true });
+    } catch (err) {
+      callback({ ok: false, error: err.message });
+    }
+  });
+
+  // Server start arguments (for the manual update flow)
+  socket.on('get-server-startargs', (data, callback) => {
+    try {
+      const srv = manager.getServer(data.serverId);
+      callback({ ok: true, startArgs: srv.startArgs });
+    } catch (err) {
+      callback({ ok: false, error: err.message });
+    }
+  });
+
+  socket.on('set-server-startargs', (data, callback) => {
+    try {
+      const info = manager.setServerStartArgs(data.serverId, data.startArgs);
+      io.to(`server:${data.serverId}`).emit('status-change', info);
+      io.to('dashboard').emit('server-updated', info);
+      callback({ ok: true, server: info });
     } catch (err) {
       callback({ ok: false, error: err.message });
     }
