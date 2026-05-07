@@ -161,7 +161,7 @@ The Update modal accepts:
 
 **Optional extras in the same modal:**
 
-- **Edit start arguments** — collapsible section pre-filled with the server's current `startArgs` (one per line). Useful when bumping a NeoForge version that ships a new `unix_args.txt` path. Only the per-server config is changed; the originating template is left alone.
+- **Edit start arguments** — collapsible section pre-filled with the server's current `startArgs` (one per line). Useful when bumping a NeoForge version that ships a new `unix_args.txt` path. Only the per-server config is changed; the originating template is left alone. Any `win_args.txt` reference is automatically rewritten to `unix_args.txt` on save — see [Windows hosts](#windows-hosts) below if you actually want the Windows variant.
 - **Back up world before update** — runs the world backup pipeline (see below) before any files are touched.
 
 **Rules:**
@@ -222,6 +222,24 @@ Place your templates in the `mc-templates` volume. You can copy files into a Doc
 ```bash
 docker cp ./my-template mc-manager:/app/templates/my-template
 ```
+
+## Windows hosts
+
+The service is designed to run on Linux (Docker is the supported deployment target). To keep modded servers from being broken by accidental Windows-style argument paths, every entry point that accepts `startArgs` in [src/services/ServerManager.js](src/services/ServerManager.js) rewrites any `win_args.txt` reference to `unix_args.txt`:
+
+- `finalizeTemplate` — custom args entered when uploading a template
+- `finalizeImport` — custom args entered when importing an existing server
+- `setServerStartArgs` — the Update modal's "Edit start arguments" section
+
+The import scan (`_findArgsFile`) also prefers `unix_args.txt` when both files exist in a ZIP, and surfaces the unix path even when only `win_args.txt` is present on disk.
+
+If you are actually running this service directly on a Windows host and need NeoForge/Forge to use `win_args.txt`, remove or invert the rewrites. Each looks like:
+
+```js
+.replace(/win_args\.txt/g, 'unix_args.txt')
+```
+
+Either delete the calls, or flip them to `.replace(/unix_args\.txt/g, 'win_args.txt')` to force the Windows variant instead. You will also want to remove the unix preference in `_findArgsFile`.
 
 ## Configuration
 

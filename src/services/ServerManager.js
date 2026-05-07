@@ -294,7 +294,7 @@ class ServerManager extends EventEmitter {
     let meta;
     if (customArgs) {
       // Custom args mode (e.g. NeoForge: "@user_jvm_args.txt @libraries/.../win_args.txt")
-      const args = customArgs.trim().split(/\s+/);
+      const args = customArgs.trim().split(/\s+/).map(a => a.replace(/win_args\.txt/g, 'unix_args.txt'));
       if (args.length === 0) throw new Error('Custom arguments cannot be empty');
       meta = { startArgs: args };
     } else if (serverJar) {
@@ -434,16 +434,23 @@ class ServerManager extends EventEmitter {
   }
 
   _findArgsFile(dir, prefix) {
+    let winFallback = null;
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const rel = `${prefix}/${entry.name}`;
       if (entry.isDirectory()) {
         const found = this._findArgsFile(path.join(dir, entry.name), rel);
-        if (found) return found;
-      } else if (entry.name === 'unix_args.txt' || entry.name === 'win_args.txt') {
+        if (found) {
+          if (found.endsWith('unix_args.txt')) return found;
+          winFallback = winFallback || found;
+        }
+      } else if (entry.name === 'unix_args.txt') {
         return rel;
+      } else if (entry.name === 'win_args.txt') {
+        winFallback = winFallback || rel;
       }
     }
-    return null;
+    // Service runs on Linux — surface the unix path even when only win was found on disk
+    return winFallback ? winFallback.replace(/win_args\.txt$/, 'unix_args.txt') : null;
   }
 
   finalizeImport(importId, { name, serverJar, customArgs, port, minRam, maxRam }) {
@@ -459,7 +466,7 @@ class ServerManager extends EventEmitter {
     // Determine startArgs
     let startArgs;
     if (customArgs) {
-      const args = customArgs.trim().split(/\s+/);
+      const args = customArgs.trim().split(/\s+/).map(a => a.replace(/win_args\.txt/g, 'unix_args.txt'));
       if (args.length === 0) throw new Error('Custom arguments cannot be empty');
       startArgs = args;
     } else if (serverJar) {
@@ -696,6 +703,11 @@ class ServerManager extends EventEmitter {
         throw new Error('Each start argument must be a non-empty string');
       }
     }
+
+    // Safety: the service runs on Linux (Docker), so rewrite any win_args.txt
+    // references to unix_args.txt. Users on Windows hosts who want the reverse
+    // need to disable this in setServerStartArgs (see README "Windows hosts").
+    startArgs = startArgs.map(arg => arg.replace(/win_args\.txt/g, 'unix_args.txt'));
 
     // Jar mode: validate the referenced jar exists in the server directory
     if (startArgs[0] === '-jar') {
