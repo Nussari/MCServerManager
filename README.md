@@ -147,10 +147,12 @@ Settings can be changed after creation via the Edit button on the server detail 
 
 ## Updating Server Files
 
-The server detail page has a **Files** menu (top-right of the action bar) with two options:
+The server detail page has a **Files** menu (top-right of the action bar) with these options:
 
 - **Mods** — manage the server's `mods/` directory (jars only).
 - **Update** — drop new files or folders into the server directory, replacing whatever is already there.
+- **Download World** — zips the world dirs and streams the archive to your browser.
+- **Backup World** / **Restore World** — see [World Backups](#world-backups) below.
 
 The Update modal accepts:
 
@@ -170,15 +172,17 @@ The Update modal accepts:
 
 ## World Backups
 
-Click the **Backup** button on a server's detail page to create a ZIP of the world data. Only world folders are included (the `level-name` dir plus any `{level-name}_nether` / `{level-name}_the_end` dims) — not mods, configs, or server jars.
+The server detail page's **Files** dropdown contains **Backup World**, **Restore World**, and **Download World**, plus a small footer line showing the current backup's size and timestamp (or "No backup").
 
-Click **Restore** to replace the current world with the stored backup. The button is disabled when no backup exists.
+- **Backup World** creates a ZIP of the world data on the server host. Only world folders are included (the `level-name` dir plus any `{level-name}_nether` / `{level-name}_the_end` dims) — not mods, configs, or server jars.
+- **Restore World** replaces the current world with the stored backup. Disabled when no backup exists.
+- **Download World** zips the world dirs and streams the archive to your browser, leaving the stored backup untouched. Use this to grab a copy of the world without overwriting the server-side backup slot.
 
 **Rules:**
-- The server must be stopped before backing up or restoring (ensures a consistent save).
-- Each server has at most one backup. Running a new backup overwrites the previous one — the UI asks for confirmation first.
+- The server must be stopped before backing up, restoring, or downloading the world (ensures a consistent save).
+- Each server has at most one stored backup. Running a new backup overwrites the previous one — the UI asks for confirmation first.
 - Restore only replaces the folders present in the backup ZIP; unrelated server files are left untouched.
-- Backups are stored in `backups/{serverId}.zip` and are deleted when the server is deleted.
+- Stored backups live in `backups/{serverId}.zip` and are deleted when the server is deleted. Download archives are written to a temp file, streamed to the browser, then removed.
 
 ## Docker
 
@@ -277,6 +281,7 @@ All settings are configurable via environment variables:
 | `has-backup` | `{ serverId }` | Check if a world backup exists (callback: `{ ok, exists }`) |
 | `backup-server` | `{ serverId }` | Create/overwrite the world backup; server must be stopped (callback: `{ ok, size, createdAt }`) |
 | `restore-backup` | `{ serverId }` | Replace the world folders with the stored backup; server must be stopped (callback: `{ ok }`) |
+| `check-world-download` | `{ serverId }` | Validate that the world can be downloaded (server stopped + world exists). Used as a precheck before navigating to `/api/download-world` (callback: `{ ok, levelName, serverName }`) |
 
 ### HTTP Endpoints
 
@@ -286,6 +291,7 @@ All settings are configurable via environment variables:
 | `POST` | `/api/import-server?name=<name>` | Raw ZIP binary | Upload server ZIP for import (streams to disk). Returns `{ ok, importId, jarFiles, detectedSettings, hasEula, moddedHint }`. |
 | `POST` | `/api/update-server-file?id=<serverId>&relpath=<path>` | Raw file binary | Stream a single file into the server directory at `relpath`, overwriting on conflict. Server must be stopped. Returns `{ ok, overwritten }`. |
 | `POST` | `/api/update-server-zip?id=<serverId>` | Raw ZIP binary | Stream a ZIP, extract into the server directory, overwriting on conflict. Server must be stopped. Returns `{ ok, added, overwritten }`. |
+| `GET` | `/api/download-world?id=<serverId>` | — | Build a ZIP of the server's world dirs and stream it as an attachment. Server must be stopped. Returns `400 { ok: false, error }` on failure. Run `check-world-download` first to surface friendly errors. |
 
 ### Server → Client
 

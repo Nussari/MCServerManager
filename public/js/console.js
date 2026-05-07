@@ -12,8 +12,9 @@ const infoEl = document.getElementById('server-info');
 const btnStart = document.getElementById('btn-start');
 const btnStop = document.getElementById('btn-stop');
 const btnEdit = document.getElementById('btn-edit');
-const btnBackup = document.getElementById('btn-backup');
-const btnRestore = document.getElementById('btn-restore');
+const menuBackup = document.getElementById('files-menu-backup');
+const menuRestore = document.getElementById('files-menu-restore');
+const menuDownloadWorld = document.getElementById('files-menu-download-world');
 const backupInfoEl = document.getElementById('backup-info');
 const consoleOutput = document.getElementById('console-output');
 const commandInput = document.getElementById('command-input');
@@ -131,7 +132,7 @@ function refreshBackupState() {
   socket.emit('has-backup', { serverId }, (res) => {
     if (!res || !res.ok) return;
     hasBackup = res.exists;
-    btnRestore.disabled = !hasBackup;
+    menuRestore.disabled = !hasBackup;
     if (hasBackup) {
       const when = new Date(res.createdAt).toLocaleString();
       backupInfoEl.textContent = `Backup: ${formatBackupSize(res.size)} · ${when}`;
@@ -143,43 +144,55 @@ function refreshBackupState() {
 
 refreshBackupState();
 
-btnBackup.onclick = () => {
+function backupWorld() {
   if (hasBackup && !confirm('An existing backup will be overwritten. Continue?')) return;
-  btnBackup.disabled = true;
-  const originalText = btnBackup.textContent;
-  btnBackup.textContent = 'Backing up...';
+  menuBackup.disabled = true;
+  showToast('Backing up world...');
   socket.emit('backup-server', { serverId }, (r) => {
-    btnBackup.disabled = false;
-    btnBackup.textContent = originalText;
+    menuBackup.disabled = false;
     if (r.ok) {
       hasBackup = true;
-      btnRestore.disabled = false;
+      menuRestore.disabled = false;
       refreshBackupState();
-      alert(`Backup complete (${formatBackupSize(r.size)}).`);
+      showToast(`Backup complete (${formatBackupSize(r.size)})`);
     } else {
-      alert('Backup failed: ' + r.error);
+      showToast('Backup failed: ' + r.error, 'error');
     }
   });
-};
+}
 
-btnRestore.onclick = () => {
-  if (btnRestore.disabled) return;
+function restoreWorld() {
+  if (menuRestore.disabled) return;
   if (!confirm('Restore will overwrite the current world with the backup. Continue?')) return;
-  btnRestore.disabled = true;
-  btnBackup.disabled = true;
-  const originalText = btnRestore.textContent;
-  btnRestore.textContent = 'Restoring...';
+  menuRestore.disabled = true;
+  menuBackup.disabled = true;
+  showToast('Restoring world...');
   socket.emit('restore-backup', { serverId }, (r) => {
-    btnRestore.textContent = originalText;
-    btnRestore.disabled = !hasBackup;
-    btnBackup.disabled = false;
+    menuRestore.disabled = !hasBackup;
+    menuBackup.disabled = false;
     if (r.ok) {
-      alert('Restore complete.');
+      showToast('Restore complete');
     } else {
-      alert('Restore failed: ' + r.error);
+      showToast('Restore failed: ' + r.error, 'error');
     }
   });
-};
+}
+
+function downloadWorld() {
+  socket.emit('check-world-download', { serverId }, (r) => {
+    if (!r || !r.ok) {
+      showToast('Cannot download: ' + (r && r.error ? r.error : 'unknown error'), 'error');
+      return;
+    }
+    showToast('Preparing world ZIP — your download will start shortly');
+    const a = document.createElement('a');
+    a.href = `/api/download-world?id=${encodeURIComponent(serverId)}`;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+}
 
 
 function updateButtons() {
@@ -403,6 +416,22 @@ document.getElementById('files-menu-update').onclick = () => {
   openUpdateModal();
 };
 
+menuDownloadWorld.onclick = () => {
+  filesMenu.classList.remove('open');
+  downloadWorld();
+};
+
+menuBackup.onclick = () => {
+  filesMenu.classList.remove('open');
+  backupWorld();
+};
+
+menuRestore.onclick = () => {
+  if (menuRestore.disabled) return;
+  filesMenu.classList.remove('open');
+  restoreWorld();
+};
+
 // --- Update Modal ---
 const updateModalOverlay = document.getElementById('update-modal-overlay');
 const updateDropZone = document.getElementById('update-drop-zone');
@@ -446,6 +475,7 @@ function openUpdateModal() {
       originalArgs = [];
       updateArgsText.value = '';
     }
+    updateApplyButtonState();
   });
 
   // Hide backup row if the server has no world yet (rare, but no point offering)
@@ -562,35 +592,51 @@ function addStagedFile(file, relpath) {
 function renderStagedList() {
   if (stagedFiles.length === 0) {
     updateStagedList.innerHTML = '';
-    applyUpdateBtn.disabled = true;
-    return;
+  } else {
+    const totalBytes = stagedFiles.reduce((s, f) => s + f.file.size, 0);
+    const isSingleZip = stagedFiles.length === 1 && stagedFiles[0].relpath.toLowerCase().endsWith('.zip');
+    const summary = isSingleZip
+      ? `1 ZIP archive (${formatBytes(totalBytes)}) — will be extracted on the server`
+      : `${stagedFiles.length} file${stagedFiles.length === 1 ? '' : 's'} · ${formatBytes(totalBytes)}`;
+
+    const rows = stagedFiles.map((s, i) => `
+      <div class="staged-row">
+        <span class="path" title="${esc(s.relpath)}">${esc(s.relpath)}</span>
+        <span class="size">${formatBytes(s.file.size)}</span>
+        <button type="button" class="remove" data-i="${i}" title="Remove">&times;</button>
+      </div>
+    `).join('');
+
+    updateStagedList.innerHTML = `<div class="staged-summary">${summary}</div>${rows}`;
+    updateStagedList.querySelectorAll('.remove').forEach(btn => {
+      btn.onclick = () => {
+        stagedFiles.splice(parseInt(btn.dataset.i, 10), 1);
+        renderStagedList();
+      };
+    });
   }
-  const totalBytes = stagedFiles.reduce((s, f) => s + f.file.size, 0);
-  const isSingleZip = stagedFiles.length === 1 && stagedFiles[0].relpath.toLowerCase().endsWith('.zip');
-  const summary = isSingleZip
-    ? `1 ZIP archive (${formatBytes(totalBytes)}) — will be extracted on the server`
-    : `${stagedFiles.length} file${stagedFiles.length === 1 ? '' : 's'} · ${formatBytes(totalBytes)}`;
-
-  const rows = stagedFiles.map((s, i) => `
-    <div class="staged-row">
-      <span class="path" title="${esc(s.relpath)}">${esc(s.relpath)}</span>
-      <span class="size">${formatBytes(s.file.size)}</span>
-      <button type="button" class="remove" data-i="${i}" title="Remove">&times;</button>
-    </div>
-  `).join('');
-
-  updateStagedList.innerHTML = `<div class="staged-summary">${summary}</div>${rows}`;
-  updateStagedList.querySelectorAll('.remove').forEach(btn => {
-    btn.onclick = () => {
-      stagedFiles.splice(parseInt(btn.dataset.i, 10), 1);
-      renderStagedList();
-    };
-  });
-
-  // Enable Apply only if the server is stopped
-  const running = currentStatus === 'running' || currentStatus === 'starting' || currentStatus === 'stopping';
-  applyUpdateBtn.disabled = running;
+  updateApplyButtonState();
 }
+
+// Compute the args list as it would be sent right now (trimmed, no blanks).
+function getEditedArgs() {
+  return updateArgsText.value.split('\n').map(s => s.trim()).filter(Boolean);
+}
+
+function isArgsChanged() {
+  const cur = getEditedArgs();
+  if (cur.length !== originalArgs.length) return true;
+  return cur.some((v, i) => v !== originalArgs[i]);
+}
+
+// Apply is enabled if there is something to apply (files OR args change) AND the server is stopped.
+function updateApplyButtonState() {
+  const running = currentStatus === 'running' || currentStatus === 'starting' || currentStatus === 'stopping';
+  const hasChanges = stagedFiles.length > 0 || isArgsChanged();
+  applyUpdateBtn.disabled = running || !hasChanges;
+}
+
+updateArgsText.addEventListener('input', updateApplyButtonState);
 
 function formatBytes(b) {
   if (b < 1024) return `${b} B`;
@@ -601,7 +647,9 @@ function formatBytes(b) {
 
 // --- Apply the update ---
 applyUpdateBtn.onclick = async () => {
-  if (stagedFiles.length === 0) return;
+  const argsChanged = isArgsChanged();
+  if (stagedFiles.length === 0 && !argsChanged) return;
+
   updateError.textContent = '';
   applyUpdateBtn.disabled = true;
   document.getElementById('cancel-update').disabled = true;
@@ -621,53 +669,57 @@ applyUpdateBtn.onclick = async () => {
       refreshBackupState();
     }
 
-    // Step 2: upload files
-    const isSingleZip = stagedFiles.length === 1 && stagedFiles[0].relpath.toLowerCase().endsWith('.zip');
+    // Step 2: upload files (skipped if nothing staged)
     let totalAdded = 0;
     let totalOverwritten = 0;
-
-    if (isSingleZip) {
-      const result = await uploadZip(stagedFiles[0].file);
-      totalAdded += result.added || 0;
-      totalOverwritten += result.overwritten || 0;
-    } else {
-      const totalBytes = stagedFiles.reduce((s, f) => s + f.file.size, 0);
-      let bytesDone = 0;
-      let filesDone = 0;
-      for (const staged of stagedFiles) {
-        updateProgressText.textContent = `Uploading ${filesDone + 1}/${stagedFiles.length}: ${staged.relpath}`;
-        const result = await uploadFile(staged, (loaded) => {
-          const pct = totalBytes > 0 ? Math.round(((bytesDone + loaded) / totalBytes) * 100) : 0;
-          updateProgressBar.style.width = `${pct}%`;
-        });
-        bytesDone += staged.file.size;
-        filesDone += 1;
-        if (result.overwritten) totalOverwritten++; else totalAdded++;
+    if (stagedFiles.length > 0) {
+      const isSingleZip = stagedFiles.length === 1 && stagedFiles[0].relpath.toLowerCase().endsWith('.zip');
+      if (isSingleZip) {
+        const result = await uploadZip(stagedFiles[0].file);
+        totalAdded += result.added || 0;
+        totalOverwritten += result.overwritten || 0;
+      } else {
+        const totalBytes = stagedFiles.reduce((s, f) => s + f.file.size, 0);
+        let bytesDone = 0;
+        let filesDone = 0;
+        for (const staged of stagedFiles) {
+          updateProgressText.textContent = `Uploading ${filesDone + 1}/${stagedFiles.length}: ${staged.relpath}`;
+          const result = await uploadFile(staged, (loaded) => {
+            const pct = totalBytes > 0 ? Math.round(((bytesDone + loaded) / totalBytes) * 100) : 0;
+            updateProgressBar.style.width = `${pct}%`;
+          });
+          bytesDone += staged.file.size;
+          filesDone += 1;
+          if (result.overwritten) totalOverwritten++; else totalAdded++;
+        }
       }
     }
 
-    // Step 3: update start args if changed
-    const newArgs = updateArgsText.value
-      .split('\n')
-      .map(s => s.trim())
-      .filter(Boolean);
-    const argsChanged = newArgs.length !== originalArgs.length
-      || newArgs.some((v, i) => v !== originalArgs[i]);
-    if (argsChanged && newArgs.length > 0) {
+    // Step 3: update start args if changed (must happen AFTER file uploads so any
+    // referenced jar that was just added passes the existence check)
+    if (argsChanged) {
+      const newArgs = getEditedArgs();
+      if (newArgs.length === 0) throw new Error('Start arguments cannot be empty');
       updateProgressText.textContent = 'Updating start arguments...';
+      updateProgressBar.style.width = '100%';
       await new Promise((resolve, reject) => {
         socket.emit('set-server-startargs', { serverId, startArgs: newArgs }, (r) => {
           if (r.ok) resolve();
           else reject(new Error(r.error || 'Failed to update start arguments'));
         });
       });
+      // Reflect the new baseline so re-clicking Apply doesn't re-send the same args
+      originalArgs = newArgs.slice();
     }
 
     closeUpdateModal();
-    showToast(`Update applied — ${totalAdded} added, ${totalOverwritten} overwritten`);
+    const parts = [];
+    if (stagedFiles.length > 0) parts.push(`${totalAdded} added, ${totalOverwritten} overwritten`);
+    if (argsChanged) parts.push('start arguments updated');
+    showToast(`Update applied — ${parts.join(' · ')}`);
   } catch (err) {
     updateError.textContent = err.message;
-    applyUpdateBtn.disabled = false;
+    updateApplyButtonState();
   } finally {
     document.getElementById('cancel-update').disabled = false;
     updateProgress.style.display = 'none';

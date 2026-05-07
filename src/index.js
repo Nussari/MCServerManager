@@ -15,8 +15,22 @@ const server = http.createServer(app);
 const io = new SocketIO(server, { maxHttpBufferSize: 5 * 1024 * 1024 });
 const manager = new ServerManager();
 
-// Serve static frontend files
-app.use(express.static(path.join(__dirname, '../public')));
+// Serve HTML with cache-busting version substitution. The two pages reference
+// CSS/JS via `?v=__APPVERSION__` placeholders; we replace them per-request so
+// every release invalidates the browser cache automatically.
+const PUBLIC_DIR = path.join(__dirname, '../public');
+function sendHtmlWithVersion(req, res, file) {
+  fs.readFile(path.join(PUBLIC_DIR, file), 'utf-8', (err, html) => {
+    if (err) return res.status(404).end();
+    res.set('Cache-Control', 'no-cache');
+    res.type('html').send(html.replace(/__APPVERSION__/g, pkg.version));
+  });
+}
+app.get('/', (req, res) => sendHtmlWithVersion(req, res, 'index.html'));
+app.get('/server.html', (req, res) => sendHtmlWithVersion(req, res, 'server.html'));
+
+// Serve static frontend files (JS, CSS, images). The HTML routes above run first.
+app.use(express.static(PUBLIC_DIR));
 
 // Version endpoint
 app.get('/api/version', (_req, res) => res.json({ version: pkg.version }));
@@ -162,6 +176,33 @@ app.post('/api/update-server-zip', async (req, res) => {
     res.json({ ok: false, error: err.message });
   } finally {
     try { fs.rmSync(tempZip, { force: true }); } catch {}
+  }
+});
+
+// HTTP world download — builds a ZIP of the server's world dirs and streams it.
+// Caller is expected to have run `check-world-download` first; we still validate, but on
+// failure we have to send JSON because the browser is following an <a> link.
+app.get('/api/download-world', async (req, res) => {
+  const { id } = req.query;
+  if (!id) {
+    return res.status(400).json({ ok: false, error: 'Missing id' });
+  }
+
+  let tempPath = null;
+  try {
+    const result = await manager.createWorldDownloadZip(id);
+    tempPath = result.tempPath;
+    const safeName = result.serverName.replace(/[^a-zA-Z0-9._-]+/g, '_');
+    const safeLevel = result.levelName.replace(/[^a-zA-Z0-9._-]+/g, '_');
+    const filename = `${safeName}-${safeLevel}.zip`;
+    res.download(tempPath, filename, () => {
+      try { fs.rmSync(tempPath, { force: true }); } catch {}
+    });
+  } catch (err) {
+    if (tempPath) {
+      try { fs.rmSync(tempPath, { force: true }); } catch {}
+    }
+    res.status(400).json({ ok: false, error: err.message });
   }
 });
 
@@ -427,6 +468,17 @@ io.on('connection', (socket) => {
     try {
       await manager.restoreBackup(data.serverId);
       callback({ ok: true });
+    } catch (err) {
+      callback({ ok: false, error: err.message });
+    }
+  });
+
+  // Precheck for the world download flow — surfaces a friendly error before the browser
+  // navigates to /api/download-world (which would otherwise just render JSON on failure).
+  socket.on('check-world-download', (data, callback) => {
+    try {
+      const info = manager.checkWorldDownload(data.serverId);
+      callback({ ok: true, ...info });
     } catch (err) {
       callback({ ok: false, error: err.message });
     }

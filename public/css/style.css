@@ -591,7 +591,24 @@ details.advanced-section summary:hover {
   cursor: pointer;
 }
 
-.files-menu-item:hover { background: var(--border); }
+.files-menu-item:hover:not(:disabled) { background: var(--border); }
+
+.files-menu-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.files-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+.files-menu-info {
+  padding: 4px 12px 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
 
 /* Wide modal variant for the update flow */
 .modal-wide { max-width: 600px; }

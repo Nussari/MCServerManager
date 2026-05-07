@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Server Console</title>
   <link rel="icon" type="image/png" href="/mcsm.png">
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/style.css?v=__APPVERSION__">
 </head>
 <body>
   <span class="version-label" id="version-label"></span>
@@ -28,11 +28,13 @@
         <div class="files-menu" id="files-menu">
           <button type="button" class="files-menu-item" id="files-menu-mods">Mods</button>
           <button type="button" class="files-menu-item" id="files-menu-update">Update</button>
+          <div class="files-menu-divider"></div>
+          <button type="button" class="files-menu-item" id="files-menu-download-world">Download World</button>
+          <button type="button" class="files-menu-item" id="files-menu-backup">Backup World</button>
+          <button type="button" class="files-menu-item" id="files-menu-restore" disabled>Restore World</button>
+          <div class="files-menu-info" id="backup-info">No backup</div>
         </div>
       </div>
-      <button class="btn btn-secondary" id="btn-backup">Backup</button>
-      <button class="btn btn-secondary" id="btn-restore" disabled>Restore</button>
-      <span id="backup-info" style="font-size:0.8rem;color:var(--text-muted);align-self:center"></span>
     </div>
 
     <div class="console-container" style="margin-top:16px; position:relative">
@@ -228,7 +230,7 @@
   <div class="toast-container" id="toast-container"></div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/js/utils.js"></script>
-  <script src="/js/console.js"></script>
+  <script src="/js/utils.js?v=__APPVERSION__"></script>
+  <script src="/js/console.js?v=__APPVERSION__"></script>
 </body>
 </html>

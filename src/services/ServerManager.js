@@ -733,22 +733,15 @@ class ServerManager extends EventEmitter {
     return { size: stat.size, createdAt: stat.mtime.toISOString() };
   }
 
-  async backupServer(id) {
-    const server = this.getServer(id);
-
-    if (server.status === STATUS.RUNNING || server.status === STATUS.STARTING || server.status === STATUS.STOPPING) {
-      throw new Error('Stop the server before creating a backup');
-    }
-
-    // Determine world folder name from server.properties (default "world")
+  // Resolves world directories for a server: the main level dir plus its nether/end siblings.
+  // Returns { levelName, worldDirs: string[] }. worldDirs is empty if nothing was found.
+  _findWorldDirs(server) {
     let levelName = 'world';
     const propsPath = path.join(server.directory, 'server.properties');
     if (fs.existsSync(propsPath)) {
       const { entries } = properties.parse(propsPath);
       if (entries['level-name']) levelName = entries['level-name'];
     }
-
-    // Include the main world plus nether/end dirs (world, world_nether, world_the_end)
     const worldDirs = [];
     for (const entry of fs.readdirSync(server.directory, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
@@ -756,7 +749,17 @@ class ServerManager extends EventEmitter {
         worldDirs.push(entry.name);
       }
     }
+    return { levelName, worldDirs };
+  }
 
+  async backupServer(id) {
+    const server = this.getServer(id);
+
+    if (server.status === STATUS.RUNNING || server.status === STATUS.STARTING || server.status === STATUS.STOPPING) {
+      throw new Error('Stop the server before creating a backup');
+    }
+
+    const { levelName, worldDirs } = this._findWorldDirs(server);
     if (worldDirs.length === 0) {
       throw new Error(`No world directory found (looked for "${levelName}")`);
     }
@@ -773,6 +776,49 @@ class ServerManager extends EventEmitter {
 
     const stat = fs.statSync(backupPath);
     return { size: stat.size, createdAt: stat.mtime.toISOString() };
+  }
+
+  // Quick precheck for the world download flow — verifies the server is stopped and a world exists.
+  // Throws on failure; returns { levelName, serverName } on success.
+  checkWorldDownload(id) {
+    const server = this.getServer(id);
+    if (server.status === STATUS.RUNNING || server.status === STATUS.STARTING || server.status === STATUS.STOPPING) {
+      throw new Error('Stop the server before downloading the world');
+    }
+    const { levelName, worldDirs } = this._findWorldDirs(server);
+    if (worldDirs.length === 0) {
+      throw new Error(`No world directory found (looked for "${levelName}")`);
+    }
+    return { levelName, serverName: server.name };
+  }
+
+  // Builds a fresh ZIP of the server's world directories at a temp path. Caller must delete
+  // the temp file once it has been streamed (or the request errored out).
+  async createWorldDownloadZip(id) {
+    const server = this.getServer(id);
+    if (server.status === STATUS.RUNNING || server.status === STATUS.STARTING || server.status === STATUS.STOPPING) {
+      throw new Error('Stop the server before downloading the world');
+    }
+
+    const { levelName, worldDirs } = this._findWorldDirs(server);
+    if (worldDirs.length === 0) {
+      throw new Error(`No world directory found (looked for "${levelName}")`);
+    }
+
+    const zip = new AdmZip();
+    for (const dir of worldDirs) {
+      zip.addLocalFolder(path.join(server.directory, dir), dir);
+    }
+
+    const suffix = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const tempPath = path.join(config.DATA_DIR, `_download_${id}_${suffix}.zip`);
+    try {
+      await zip.writeZipPromise(tempPath);
+    } catch (err) {
+      try { fs.rmSync(tempPath, { force: true }); } catch {}
+      throw err;
+    }
+    return { tempPath, levelName, serverName: server.name };
   }
 
   async restoreBackup(id) {
