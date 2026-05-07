@@ -304,6 +304,26 @@ body {
   border-color: var(--accent);
 }
 
+.icon-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.icon-edit-row #edit-icon-preview {
+  width: 64px;
+  height: 64px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.icon-edit-row input[type="file"] {
+  flex: 1;
+}
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

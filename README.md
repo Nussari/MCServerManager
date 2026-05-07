@@ -310,6 +310,7 @@ All settings are configurable via environment variables:
 | `POST` | `/api/update-server-file?id=<serverId>&relpath=<path>` | Raw file binary | Stream a single file into the server directory at `relpath`, overwriting on conflict. Server must be stopped. Returns `{ ok, overwritten }`. |
 | `POST` | `/api/update-server-zip?id=<serverId>` | Raw ZIP binary | Stream a ZIP, extract into the server directory, overwriting on conflict. Server must be stopped. Returns `{ ok, added, overwritten }`. |
 | `GET` | `/api/download-world?id=<serverId>` | — | Build a ZIP of the server's world dirs and stream it as an attachment. Server must be stopped. Returns `400 { ok: false, error }` on failure. Run `check-world-download` first to surface friendly errors. |
+| `GET` | `/api/server-icon?id=<serverId>` | — | Stream the server's `server-icon.png` for in-UI preview. Returns `404` if the server has no icon. |
 
 ### Server → Client
 

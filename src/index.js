@@ -206,6 +206,19 @@ app.get('/api/download-world', async (req, res) => {
   }
 });
 
+// HTTP server icon — serves the per-server server-icon.png for previewing in the UI.
+app.get('/api/server-icon', (req, res) => {
+  const { id } = req.query;
+  if (!id) return res.status(400).end();
+  let server;
+  try { server = manager.getServer(id); }
+  catch { return res.status(404).end(); }
+  const iconPath = path.join(server.directory, 'server-icon.png');
+  if (!fs.existsSync(iconPath)) return res.status(404).end();
+  res.set('Cache-Control', 'no-cache');
+  res.sendFile(iconPath);
+});
+
 // Initialize server manager
 manager.init();
 console.log(`Loaded ${manager.listServers().length} server(s) from registry`);

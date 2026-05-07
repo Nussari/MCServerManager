@@ -256,7 +256,36 @@ function populateEditForm(s) {
   const ramSelect = document.getElementById('edit-maxram');
   const clampedRam = Math.max(1, Math.min(10, ramGB));
   ramSelect.value = String(clampedRam);
+
+  // Reset icon picker and load existing icon (if any). The img stays hidden on 404.
+  const iconInput = document.getElementById('edit-icon');
+  iconInput.value = '';
+  loadEditIconPreview();
 }
+
+function loadEditIconPreview() {
+  const img = document.getElementById('edit-icon-preview');
+  if (img.dataset.objectUrl) {
+    URL.revokeObjectURL(img.dataset.objectUrl);
+    delete img.dataset.objectUrl;
+  }
+  img.hidden = true;
+  img.onload = () => { img.hidden = false; };
+  img.onerror = () => { img.hidden = true; };
+  img.src = `/api/server-icon?id=${encodeURIComponent(serverId)}&t=${Date.now()}`;
+}
+
+document.getElementById('edit-icon').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  const img = document.getElementById('edit-icon-preview');
+  if (!file) { loadEditIconPreview(); return; }
+  // Revoke any previous object URL we set on the img to avoid leaks.
+  if (img.dataset.objectUrl) URL.revokeObjectURL(img.dataset.objectUrl);
+  const url = URL.createObjectURL(file);
+  img.dataset.objectUrl = url;
+  img.src = url;
+  img.hidden = false;
+});
 
 // --- Mods Modal ---
 const modsModalOverlay = document.getElementById('mods-modal-overlay');
@@ -382,6 +411,7 @@ editForm.onsubmit = (e) => {
         socket.emit('upload-server-icon', { serverId, imageData: buf }, () => {});
       }
       closeEditModal();
+      iconInput.value = '';
     } else {
       editFormError.textContent = res.error;
     }
