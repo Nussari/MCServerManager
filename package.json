@@ -1,12 +1,13 @@
 {
   "name": "minecraft-server-manager",
-  "version": "1.7.2",
+  "version": "1.8.0",
   "private": true,
   "description": "Web dashboard for managing multiple Minecraft servers",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "test": "node --test --test-reporter=spec \"tests/**/*.test.js\""
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
@@ -14,5 +15,9 @@
     "sharp": "^0.33.5",
     "socket.io": "^4.7.5",
     "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.7.5",
+    "supertest": "^7.0.0"
   }
 }
