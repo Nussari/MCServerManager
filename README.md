@@ -261,6 +261,22 @@ All settings are configurable via environment variables:
 | `BASE_MC_PORT` | `25565` | Starting port for auto-assignment |
 | `DEFAULT_JVM_FLAGS` | — | Extra JVM flags appended after the base G1GC flags for all servers. Applied last, so they override defaults |
 
+## Testing
+
+```bash
+npm test          # run the full suite locally
+```
+
+The suite uses the built-in `node:test` runner with `supertest` (HTTP) and `socket.io-client` (Socket.IO). No real Minecraft servers are spawned — `child_process.spawn` is stubbed and stdout lines are driven directly to exercise the state machine. Tests are organized as:
+
+- `tests/unit/` — `properties`, `config`, `mojang`, `MinecraftServer` (stubbed spawn), `ServerManager` (real fs in tmp dirs)
+- `tests/http/` — HTTP routes via `supertest`
+- `tests/socket/` — Socket.IO events via an ephemeral `server.listen(0)`
+
+CI runs on every pull request via [.github/workflows/ci.yml](.github/workflows/ci.yml): `node --test` on `ubuntu-latest` and `windows-latest`, plus a `docker build` smoke job. After enabling branch protection on `main`, PRs cannot be merged while any of those checks fail.
+
+What the suite does **not** cover (intentionally): real Java/Minecraft server lifecycle, real network calls to the Mojang API, OS-level TCP port collisions, frontend browser behavior, or container runtime behavior. Those remain manual smoke checks before tagging a release.
+
 ## How It Works
 
 - **Java auto-detection**: On start, the service reads the class file version from the server JAR's main class and selects the best matching JDK from the configured `JAVA_<version>` paths. G1GC is used with minimal, clean flags — JDK 21's G1 defaults are well-tuned out of the box. Performance data and core dumps are disabled for Docker compatibility. Extra JVM flags can be added via the `DEFAULT_JVM_FLAGS` env var.
